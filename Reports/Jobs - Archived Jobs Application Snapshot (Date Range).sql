@@ -1,5 +1,13 @@
 SET NOCOUNT ON
 
+DECLARE @StartDate nvarchar(14) = DATENAME(DAY, SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2)) 
++ ' ' + DATENAME(MONTH,SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2)) 
++ ' ' + DATENAME(YEAR,SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2))
+
+DECLARE @EndDate nvarchar(14) = DATENAME(DAY, SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2)) 
++ ' ' + DATENAME(MONTH,SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2)) 
++ ' ' + DATENAME(YEAR,SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2))
+
 SELECT REQ1.uidId AS 'uidRequisitionId',
 REQ1.nvcReferenceCode AS 'JobRefNo', 
 RWS1.nvcName AS 'JobStatus',
@@ -171,7 +179,7 @@ DELETE FROM #tmpJobReportSnapshot1
 WHERE uidRequisitionId NOT IN 
 (
 	SELECT uidRequisitionId FROM #tmpJobReportSnapshot1
-	WHERE DateJobArchived >= '@FromDate' AND DateJobArchived <= '@ToDate'
+	WHERE DateJobArchived >= @StartDate AND DateJobArchived <= @EndDate
 )
 
 CREATE TABLE #tmpRequisitionWorkflowstepDates   

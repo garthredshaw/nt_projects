@@ -1,12 +1,23 @@
 SET NOCOUNT ON
 
+DECLARE @StartDate nvarchar(14) = DATENAME(DAY, SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2)) 
++ ' ' + DATENAME(MONTH,SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2)) 
++ ' ' + DATENAME(YEAR,SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2))
+
+DECLARE @EndDate nvarchar(14) = DATENAME(DAY, SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2)) 
++ ' ' + DATENAME(MONTH,SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2)) 
++ ' ' + DATENAME(YEAR,SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2))
+
+
 SELECT RWA.uidRequisitionId
 INTO #tmpRequisitionFilter
 FROM relRequisitionWorkflowAction RWA
 JOIN refRequisitionWorkflowStep RWS
 ON RWA.uidRequisitionWorkflowStepId = RWS.uidId AND RWS.bitPublished = 1
-WHERE RWA.dteLandingDate >= '@FromDate'
-AND RWA.dteLandingDate <= '@ToDate'
+--WHERE RWA.dteLandingDate >= @StartDate 
+--AND RWA.dteLandingDate <= @EndDate 
+WHERE CAST(FLOOR(CAST(RWA.dteLandingDate AS FLOAT))AS DATETIME) >= @StartDate
+AND CAST(FLOOR(CAST(RWA.dteLandingDate AS FLOAT))AS DATETIME) <= @EndDate
 
 SELECT AC.uidAgencyId AS uidAgencyId,
 APP.uidRequisitionId AS uidRequisitionId,
@@ -26,6 +37,7 @@ JOIN relReferenceDataTranslation RDT
 ON RDI.uidId = RDT.uidReferenceDataItemId AND RDT.uidLanguageId = '4850874D-715B-4950-B188-738E2FFC1520' -- English
 JOIN relAgencyCandidate AC 
 ON C.uidId = AC.uidCandidateId 
+WHERE APP.uidRequisitionId IN (SELECT uidRequisitionId FROM #tmpRequisitionFilter)
 GROUP BY AC.uidAgencyId, APP.uidRequisitionId, RDT.nvcTranslation 
 
 SELECT CC.uidRequisitionId, AA.uidId AS uidApplicationWorkflowStepId, COUNT(DISTINCT AA.uidId) AS AWFCount
@@ -49,6 +61,7 @@ AND BB.dteLandingDate >=
 	)
 	AND uidApplicationId = BB.uidApplicationId 
 )
+AND CC.uidRequisitionId IN (SELECT uidRequisitionId FROM #tmpRequisitionFilter)
 GROUP BY CC.uidRequisitionId, AA.uidId
 
 SELECT R.uidId AS uidRequisitionId,

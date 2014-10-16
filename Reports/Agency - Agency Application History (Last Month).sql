@@ -26,6 +26,7 @@ JOIN relReferenceDataTranslation RDT
 ON RDI.uidId = RDT.uidReferenceDataItemId AND RDT.uidLanguageId = '4850874D-715B-4950-B188-738E2FFC1520' -- English
 JOIN relAgencyCandidate AC 
 ON C.uidId = AC.uidCandidateId 
+WHERE APP.uidRequisitionId IN (SELECT uidRequisitionId FROM #tmpRequisitionFilter)
 GROUP BY AC.uidAgencyId, APP.uidRequisitionId, RDT.nvcTranslation 
 
 SELECT CC.uidRequisitionId, AA.uidId AS uidApplicationWorkflowStepId, COUNT(DISTINCT AA.uidId) AS AWFCount
@@ -49,6 +50,7 @@ AND BB.dteLandingDate >=
 	)
 	AND uidApplicationId = BB.uidApplicationId 
 )
+AND CC.uidRequisitionId IN (SELECT uidRequisitionId FROM #tmpRequisitionFilter)
 GROUP BY CC.uidRequisitionId, AA.uidId
 
 SELECT R.uidId AS uidRequisitionId,
