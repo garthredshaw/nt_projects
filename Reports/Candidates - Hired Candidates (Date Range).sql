@@ -224,8 +224,10 @@ WHERE APP.uidId IN
 	AND AWH.uidApplicationWorkflowStepId IN 
 	(
 		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Hired'
-	)
-	WHERE AWH.dteLandingDate >= @StartDate AND AWH.dteLandingDate <= @EndDate
+	)	
+	WHERE CAST(FLOOR(CAST(AWH.dteLandingDate AS FLOAT))AS DATETIME) >= @StartDate
+	AND CAST(FLOOR(CAST(AWH.dteLandingDate AS FLOAT))AS DATETIME) <= @EndDate
+
 )
 
 CREATE TABLE #tmpRequisitionWorkflowstepDates   

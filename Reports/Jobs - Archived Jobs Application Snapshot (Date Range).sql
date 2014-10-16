@@ -179,7 +179,8 @@ DELETE FROM #tmpJobReportSnapshot1
 WHERE uidRequisitionId NOT IN 
 (
 	SELECT uidRequisitionId FROM #tmpJobReportSnapshot1
-	WHERE DateJobArchived >= @StartDate AND DateJobArchived <= @EndDate
+	WHERE CAST(FLOOR(CAST(DateJobArchived AS FLOAT))AS DATETIME) >= @StartDate
+	AND CAST(FLOOR(CAST(DateJobArchived AS FLOAT))AS DATETIME) <= @EndDate
 )
 
 CREATE TABLE #tmpRequisitionWorkflowstepDates   
