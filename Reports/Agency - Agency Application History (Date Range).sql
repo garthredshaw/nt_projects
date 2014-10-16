@@ -1,23 +1,13 @@
 SET NOCOUNT ON
-
-DECLARE @StartDate nvarchar(14) = DATENAME(DAY, SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2)) 
-+ ' ' + DATENAME(MONTH,SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2)) 
-+ ' ' + DATENAME(YEAR,SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2))
-
-DECLARE @EndDate nvarchar(14) = DATENAME(DAY, SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2)) 
-+ ' ' + DATENAME(MONTH,SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2)) 
-+ ' ' + DATENAME(YEAR,SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2))
-
+SET DATEFORMAT DMY
 
 SELECT RWA.uidRequisitionId
 INTO #tmpRequisitionFilter
 FROM relRequisitionWorkflowAction RWA
 JOIN refRequisitionWorkflowStep RWS
 ON RWA.uidRequisitionWorkflowStepId = RWS.uidId AND RWS.bitPublished = 1
---WHERE RWA.dteLandingDate >= @StartDate 
---AND RWA.dteLandingDate <= @EndDate 
-WHERE CAST(FLOOR(CAST(RWA.dteLandingDate AS FLOAT))AS DATETIME) >= @StartDate
-AND CAST(FLOOR(CAST(RWA.dteLandingDate AS FLOAT))AS DATETIME) <= @EndDate
+WHERE CAST(FLOOR(CAST(RWA.dteLandingDate AS FLOAT))AS DATETIME) >= '@FromDate'
+AND CAST(FLOOR(CAST(RWA.dteLandingDate AS FLOAT))AS DATETIME) <= '@ToDate'
 
 SELECT AC.uidAgencyId AS uidAgencyId,
 APP.uidRequisitionId AS uidRequisitionId,

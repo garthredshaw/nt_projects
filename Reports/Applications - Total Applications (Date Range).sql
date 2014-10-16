@@ -1,13 +1,5 @@
 SET NOCOUNT ON;
-
-DECLARE @StartDate nvarchar(14) = DATENAME(DAY, SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2)) 
-+ ' ' + DATENAME(MONTH,SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2)) 
-+ ' ' + DATENAME(YEAR,SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2))
-
-DECLARE @EndDate nvarchar(14) = DATENAME(DAY, SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2)) 
-+ ' ' + DATENAME(MONTH,SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2)) 
-+ ' ' + DATENAME(YEAR,SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2))
-
+SET DATEFORMAT DMY
 
 CREATE TABLE #tmpReport_HiredCandidate 
 (		
@@ -215,8 +207,8 @@ JOIN dtlRequisition REQ
 ON APP.uidRequisitionId = REQ.uidId 
 JOIN refRequisitionWorkflowStep RWFS
 ON REQ.uidRequisitionWorkflowStepId = RWFS.uidId
-WHERE CAST(FLOOR(CAST(APP.dteApplicationDate AS FLOAT))AS DATETIME) >= @StartDate
-AND CAST(FLOOR(CAST(APP.dteApplicationDate AS FLOAT))AS DATETIME) <= @EndDate
+WHERE CAST(FLOOR(CAST(APP.dteApplicationDate AS FLOAT))AS DATETIME) >= '@FromDate'
+AND CAST(FLOOR(CAST(APP.dteApplicationDate AS FLOAT))AS DATETIME) <= '@ToDate'
 
 SELECT A.uidId AS 'uidApplicationId', 
 AWPR.nvcName AS 'ReasonForRegret', 

@@ -1,12 +1,5 @@
 SET NOCOUNT ON;
-
-DECLARE @StartDate nvarchar(14) = DATENAME(DAY, SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2)) 
-+ ' ' + DATENAME(MONTH,SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2)) 
-+ ' ' + DATENAME(YEAR,SUBSTRING('@FromDate', 7, 4) + '-' + SUBSTRING('@FromDate', 4, 2) + '-' + SUBSTRING('@FromDate', 1, 2))
-
-DECLARE @EndDate nvarchar(14) = DATENAME(DAY, SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2)) 
-+ ' ' + DATENAME(MONTH,SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2)) 
-+ ' ' + DATENAME(YEAR,SUBSTRING('@ToDate', 7, 4) + '-' + SUBSTRING('@ToDate', 4, 2) + '-' + SUBSTRING('@ToDate', 1, 2))
+SET DATEFORMAT DMY
 
 
 SELECT APP.uidId AS uidApplicationId
@@ -20,8 +13,8 @@ FROM relApplication APP
 LEFT JOIN refApplicationWorkflowStep AWS ON APP.uidApplicationWorkflowStepId = AWS.uidId
 JOIN dtlCandidate C ON APP.uidCandidateId = C.uidId 
 JOIN relAgencyCandidate AC ON C.uidId = AC.uidCandidateId
-WHERE CAST(FLOOR(CAST(APP.dteApplicationDate AS FLOAT))AS DATETIME) >= @StartDate
-AND CAST(FLOOR(CAST(APP.dteApplicationDate AS FLOAT))AS DATETIME) <= @EndDate
+WHERE CAST(FLOOR(CAST(APP.dteApplicationDate AS FLOAT))AS DATETIME) >= '@FromDate'
+AND CAST(FLOOR(CAST(APP.dteApplicationDate AS FLOAT))AS DATETIME) <= '@ToDate'
 
 
 SELECT AC.uidAgencyId AS uidAgencyId,
