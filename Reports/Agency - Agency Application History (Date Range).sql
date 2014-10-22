@@ -1,7 +1,8 @@
+-- Agency Application History (Date Range)
 SET NOCOUNT ON
 SET DATEFORMAT DMY
 
-SELECT RWA.uidRequisitionId
+SELECT DISTINCT RWA.uidRequisitionId
 INTO #tmpRequisitionFilter
 FROM relRequisitionWorkflowAction RWA
 JOIN refRequisitionWorkflowStep RWS
@@ -9,247 +10,254 @@ ON RWA.uidRequisitionWorkflowStepId = RWS.uidId AND RWS.bitPublished = 1
 WHERE CAST(FLOOR(CAST(RWA.dteLandingDate AS FLOAT))AS DATETIME) >= '@FromDate'
 AND CAST(FLOOR(CAST(RWA.dteLandingDate AS FLOAT))AS DATETIME) <= '@ToDate'
 
-SELECT AC.uidAgencyId AS uidAgencyId,
-APP.uidRequisitionId AS uidRequisitionId,
-RDT.nvcTranslation AS nvcRace,
-COUNT(APP.uidId)AS intCountOfApplications
+SELECT APP1.uidId AS uidApplicationId,
+REQ.uidId AS uidRequisitionId,
+AREQ.uidAgencyId 
+INTO #tmpAgencyApplications
+FROM relApplication APP1
+JOIN dtlRequisition REQ ON APP1.uidRequisitionId = REQ.uidId 
+JOIN relAgencyRequisition AREQ ON REQ.uidId = AREQ.uidRequisitionId 
+WHERE REQ.uidId IN (SELECT RF1.uidRequisitionId FROM #tmpRequisitionFilter RF1)
+
+SELECT AC1.uidAgencyId AS uidAgencyId,
+APP2.uidRequisitionId AS uidRequisitionId,
+RDT1.nvcTranslation AS nvcRace,
+COUNT(APP2.uidId)AS intCountOfApplications
 INTO #tmpAgencyApplicationsByRace
-FROM relApplication APP
-JOIN dtlCandidate C
-ON APP.uidCandidateId = C.uidId 
-JOIN relCandidateSectionValue CSV
-ON C.uidId = CSV.uidCandidateId
-JOIN neptune_dynamic_objects.relCandidateFieldValue_CBAE5C2B870E48D0A8C280B713CEB2B4 CFV
-ON CSV.uidId = CFV.uidCandidateSectionValueId 
-JOIN refReferenceDataItem RDI
-ON CFV.uidIdValue = RDI.uidId AND CFV.uidCandidateFieldId = '37EA1626-39FC-4B1E-83C1-4EDFE03D66E8' -- Race
-JOIN relReferenceDataTranslation RDT
-ON RDI.uidId = RDT.uidReferenceDataItemId AND RDT.uidLanguageId = '4850874D-715B-4950-B188-738E2FFC1520' -- English
-JOIN relAgencyCandidate AC 
-ON C.uidId = AC.uidCandidateId 
-WHERE APP.uidRequisitionId IN (SELECT uidRequisitionId FROM #tmpRequisitionFilter)
-GROUP BY AC.uidAgencyId, APP.uidRequisitionId, RDT.nvcTranslation 
+FROM relApplication APP2
+JOIN dtlCandidate C1 ON APP2.uidCandidateId = C1.uidId 
+JOIN relCandidateSectionValue CSV1 ON C1.uidId = CSV1.uidCandidateId
+JOIN neptune_dynamic_objects.relCandidateFieldValue_CBAE5C2B870E48D0A8C280B713CEB2B4 CFV1 ON CSV1.uidId = CFV1.uidCandidateSectionValueId 
+JOIN refReferenceDataItem RDI1 ON CFV1.uidIdValue = RDI1.uidId AND CFV1.uidCandidateFieldId = '37EA1626-39FC-4B1E-83C1-4EDFE03D66E8' -- Race
+JOIN relReferenceDataTranslation RDT1 ON RDI1.uidId = RDT1.uidReferenceDataItemId AND RDT1.uidLanguageId = '4850874D-715B-4950-B188-738E2FFC1520' -- English
+JOIN relAgencyCandidate AC1 ON C1.uidId = AC1.uidCandidateId 
+WHERE APP2.uidId IN (SELECT uidApplicationId FROM #tmpAgencyApplications)
+GROUP BY AC1.uidAgencyId, APP2.uidRequisitionId, RDT1.nvcTranslation 
 
-SELECT CC.uidRequisitionId, AA.uidId AS uidApplicationWorkflowStepId, COUNT(DISTINCT AA.uidId) AS AWFCount
-INTO #tmpAgencyApplicationsAWFCounts
-FROM refApplicationWorkflowStep AA
-JOIN relApplicationWorkflowHistory BB ON AA.uidId = BB.uidApplicationWorkflowStepId 
-JOIN relApplication CC ON BB.uidApplicationId = CC.uidId 
-WHERE BB.uidApplicationId IN
-(
-	SELECT A1.uidId FROM relApplication A1
-	JOIN dtlRequisition R1 ON A1.uidRequisitionId = R1.uidId 
-	JOIN relAgencyRequisition AR1 ON R1.uidId = AR1.uidRequisitionId 
-)
-AND BB.dteLandingDate >=
-(
-	SELECT MAX(dteLandingDate)
-	FROM relApplicationWorkflowHistory
-	WHERE uidApplicationWorkflowStepId IN 
-	(
-		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Unprocessed'
-	)
-	AND uidApplicationId = BB.uidApplicationId 
-)
-AND CC.uidRequisitionId IN (SELECT uidRequisitionId FROM #tmpRequisitionFilter)
-GROUP BY CC.uidRequisitionId, AA.uidId
 
-SELECT R.uidId AS uidRequisitionId,
-R.nvcReferenceCode,
+;WITH sequencedApplicationHistory AS
+(
+	SELECT
+		ROW_NUMBER() OVER (ORDER BY AWH2.uidApplicationId, AWH2.dteLandingDate) as intOrder,
+		*
+	FROM relApplicationWorkflowHistory AWH2
+	WHERE
+		CAST(FLOOR(CAST(AWH2.dteLandingDate AS FLOAT))AS DATETIME) >= '01/07/2013'
+		AND CAST(FLOOR(CAST(AWH2.dteLandingDate AS FLOAT))AS DATETIME) <= '30/06/2014' 
+		AND AWH2.uidApplicationId IN (SELECT TAA1.uidApplicationId FROM #tmpAgencyApplications TAA1)		
+)
+
+SELECT SAH1.* 
+INTO #tmpSequencedApplicationHistory
+FROM sequencedApplicationHistory SAH1
+JOIN sequencedApplicationHistory SAH2 ON SAH1.uidApplicationId = SAH2.uidApplicationId AND SAH1.intOrder = SAH2.intOrder-1
+
+SELECT SAH.uidID,
+TAA2.uidRequisitionId,
+SAH.uidApplicationWorkflowStepId, 
+TAA2.uidAgencyId
+INTO #tmpAWSHistory	
+FROM #tmpSequencedApplicationHistory SAH
+JOIN #tmpAgencyApplications TAA2 ON SAH.uidApplicationId = TAA2.uidApplicationId
+
+
+SELECT REQ1.uidId AS uidRequisitionId,
+REQ1.nvcReferenceCode,
 A.nvcName AS 'AgencyName',
 (
 	SELECT nvcName
 	FROM refRequisitionWorkflowStep
-	WHERE uidId = R.uidRequisitionWorkflowStepId
+	WHERE uidId = REQ1.uidRequisitionWorkflowStepId
 ) AS 'JobStatus',
 (
 	SELECT R1.nvcFirstname + ' ' + R1.nvcLastname AS 'Creator'
 	FROM dtlRecruiter R1
-	JOIN relRecruiterRequisition RR1
-	ON R1.uidId = RR1.uidRecruiterId 
+	JOIN relRecruiterRequisition RR1 ON R1.uidId = RR1.uidRecruiterId 
 	WHERE RR1.enmRecruiterRequisitionType = 1
-	AND RR1.uidRequisitionId = R.uidId
+	AND RR1.uidRequisitionId = REQ1.uidId
 ) AS 'JobCreator',
 (
 	SELECT TOP 1 R2.nvcFirstname + ' ' + R2.nvcLastname AS 'Owner'
 	FROM dtlRecruiter R2
-	JOIN relRecruiterRequisition RR2
-	ON R2.uidId = RR2.uidRecruiterId 
+	JOIN relRecruiterRequisition RR2 ON R2.uidId = RR2.uidRecruiterId 
 	WHERE RR2.enmRecruiterRequisitionType = 2
-	AND RR2.uidRequisitionId = R.uidId
+	AND RR2.uidRequisitionId = REQ1.uidId
 ) AS 'JobOwner',
-R.dteCreationDate AS 'DateJobCreated',
+REQ1.dteCreationDate AS 'DateJobCreated',
 (
 	SELECT TOP 1 RWA2.dteLandingDate 
 	FROM refRequisitionWorkflowStep RWS2
-	JOIN relRequisitionWorkflowAction RWA2
-	ON RWS2.uidId = RWA2.uidRequisitionWorkflowStepId
+	JOIN relRequisitionWorkflowAction RWA2 ON RWS2.uidId = RWA2.uidRequisitionWorkflowStepId
 	WHERE RWS2.bitPublished = 1
-	AND RWA2.uidRequisitionId = R.uidId
+	AND RWA2.uidRequisitionId = REQ1.uidId
 ) AS 'DateJobFirstAdvertised',
 AR.intMaxApplications AS 'TotalAllowedApps',
 (
-	SELECT COUNT(uidId)
-	FROM relApplication 
-	WHERE uidRequisitionId = R.uidId
-	AND uidCandidateId IN
+	SELECT COUNT(APP3.uidId)
+	FROM relApplication APP3
+	WHERE APP3.uidRequisitionId = REQ1.uidId
+	AND APP3.uidCandidateId IN
 	(
-		SELECT uidCandidateId FROM
-		relAgencyCandidate 
-		WHERE uidAgencyId = A.uidId
+		SELECT AC2.uidCandidateId FROM
+		relAgencyCandidate AC2
+		WHERE AC2.uidAgencyId = A.uidId
 	)
 ) AS 'TotalAppsSubmitted',
 (
-	SELECT COUNT(AWH.uidId)
-	FROM relApplicationWorkflowHistory AWH
-	JOIN relApplication APP1
-	ON AWH.uidApplicationId = APP1.uidId 
-	JOIN dtlCandidate C1
-	ON APP1.uidCandidateId = C1.uidId 
-	JOIN relAgencyCandidate AC1
-	ON C1.uidId = AC1.uidCandidateId 
-	WHERE uidApplicationWorkflowPathId IN 
+	SELECT COUNT(AWH1.uidId)
+	FROM relApplicationWorkflowHistory AWH1
+	JOIN relApplication APP4 ON AWH1.uidApplicationId = APP4.uidId 
+	JOIN dtlCandidate C2 ON APP4.uidCandidateId = C2.uidId 
+	JOIN relAgencyCandidate AC3 ON C2.uidId = AC3.uidCandidateId 
+	WHERE AWH1.uidApplicationWorkflowPathId IN 
 	(
-		SELECT uidId FROM relApplicationWorkflowPath WHERE nvcName = 'Unprocessed-Regretted'
+		SELECT AWP1.uidId FROM relApplicationWorkflowPath AWP1 WHERE AWP1.nvcName = 'Unprocessed-Regretted'
 	)
-	AND APP1.uidRequisitionId = R.uidId 
-	AND AC1.uidAgencyId = A.uidId 
+	AND APP4.uidRequisitionId = REQ1.uidId 
+	AND AC3.uidAgencyId = A.uidId 
 ) AS 'TotalApps_UnporcessedToRegret',
 (
-	SELECT COUNT(AWFCount)AS 'WFS_Unprocessed'
-	FROM #tmpAgencyApplicationsAWFCounts
-	WHERE uidApplicationWorkflowStepId IN 
+	SELECT COUNT(AWSH1.uidId)AS 'WFS_Unprocessed'
+	FROM #tmpAWSHistory AWSH1
+	WHERE AWSH1.uidApplicationWorkflowStepId IN 
 	(
-		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Unprocessed'
+		SELECT AWS1.uidId FROM refApplicationWorkflowStep AWS1 WHERE AWS1.nvcName = 'Unprocessed'
 	)
-	AND uidRequisitionId = R.uidId
+	AND AWSH1.uidRequisitionId = REQ1.uidId
+	AND AWSH1.uidAgencyId = A.uidId	
 ) AS 'WFS_Unprocessed',
 (
-	SELECT COUNT(AWFCount)AS 'WFS_Longlist'
-	FROM #tmpAgencyApplicationsAWFCounts
-	WHERE uidApplicationWorkflowStepId IN 
+	SELECT COUNT(AWSH2.uidId)AS 'WFS_Longlist'
+	FROM #tmpAWSHistory AWSH2
+	WHERE AWSH2.uidApplicationWorkflowStepId IN 
 	(
-		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Longlist'
+		SELECT AWS2.uidId FROM refApplicationWorkflowStep AWS2 WHERE AWS2.nvcName = 'Longlist'
 	)
-	AND uidRequisitionId = R.uidId
+	AND AWSH2.uidRequisitionId = REQ1.uidId
+	AND AWSH2.uidAgencyId = A.uidId
 ) AS 'WFS_Longlist',
 (
-	SELECT COUNT(AWFCount)AS 'WFS_Shortlist'
-	FROM #tmpAgencyApplicationsAWFCounts
-	WHERE uidApplicationWorkflowStepId IN 
+	SELECT COUNT(AWSH3.uidId)AS 'WFS_Shortlist'
+	FROM #tmpAWSHistory AWSH3
+	WHERE AWSH3.uidApplicationWorkflowStepId IN 
 	(
-		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Shortlist'
+		SELECT AWS3.uidId FROM refApplicationWorkflowStep AWS3 WHERE AWS3.nvcName = 'Shortlist'
 	)
-	AND uidRequisitionId = R.uidId
+	AND AWSH3.uidRequisitionId = REQ1.uidId
+	AND AWSH3.uidAgencyId = A.uidId
 ) AS 'WFS_Shortlist',
 (
-	SELECT COUNT(AWFCount)AS 'WFS_Interview'
-	FROM #tmpAgencyApplicationsAWFCounts
-	WHERE uidApplicationWorkflowStepId IN 
+	SELECT COUNT(AWSH4.uidId)AS 'WFS_Interview'
+	FROM #tmpAWSHistory AWSH4
+	WHERE AWSH4.uidApplicationWorkflowStepId IN 
 	(
-		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Interview'
+		SELECT AWS4.uidId FROM refApplicationWorkflowStep AWS4 WHERE AWS4.nvcName = 'Interview'
 	)
-	AND uidRequisitionId = R.uidId
+	AND AWSH4.uidRequisitionId = REQ1.uidId
+	AND AWSH4.uidAgencyId = A.uidId
 ) AS 'WFS_Interview',
 (
-	SELECT COUNT(AWFCount)AS 'WFS_UnderReview'
-	FROM #tmpAgencyApplicationsAWFCounts
-	WHERE uidApplicationWorkflowStepId IN 
+	SELECT COUNT(AWSH5.uidId)AS 'WFS_UnderReview'
+	FROM #tmpAWSHistory AWSH5
+	WHERE AWSH5.uidApplicationWorkflowStepId IN 
 	(
-		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Under Review'
+		SELECT AWS5.uidId FROM refApplicationWorkflowStep AWS5 WHERE AWS5.nvcName = 'Under Review'
 	)
-	AND uidRequisitionId = R.uidId
+	AND AWSH5.uidRequisitionId = REQ1.uidId
+	AND AWSH5.uidAgencyId = A.uidId
 ) AS 'WFS_UnderReview',
 (
-	SELECT COUNT(AWFCount)AS 'WFS_OfferMade'
-	FROM #tmpAgencyApplicationsAWFCounts
-	WHERE uidApplicationWorkflowStepId IN 
+	SELECT COUNT(AWSH6.uidId)AS 'WFS_OfferMade'
+	FROM #tmpAWSHistory AWSH6
+	WHERE AWSH6.uidApplicationWorkflowStepId IN 
 	(
-		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Offer Made'
+		SELECT AWS6.uidId FROM refApplicationWorkflowStep AWS6 WHERE AWS6.nvcName = 'Offer Made'
 	)
-	AND uidRequisitionId = R.uidId
+	AND AWSH6.uidRequisitionId = REQ1.uidId
+	AND AWSH6.uidAgencyId = A.uidId
 ) AS 'WFS_OfferMade',
 (
-	SELECT COUNT(AWFCount)AS 'WFS_Hired'
-	FROM #tmpAgencyApplicationsAWFCounts
-	WHERE uidApplicationWorkflowStepId IN 
+	SELECT COUNT(AWSH7.uidId)AS 'WFS_Hired'
+	FROM #tmpAWSHistory AWSH7
+	WHERE AWSH7.uidApplicationWorkflowStepId IN 
 	(
-		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Hired'
+		SELECT AWS7.uidId FROM refApplicationWorkflowStep AWS7 WHERE AWS7.nvcName = 'Hired'
 	)
-	AND uidRequisitionId = R.uidId
+	AND AWSH7.uidRequisitionId = REQ1.uidId
+	AND AWSH7.uidAgencyId = A.uidId
 ) AS 'WFS_Hired',
 (
-	SELECT COUNT(AWFCount)AS 'WFS_Regretted'
-	FROM #tmpAgencyApplicationsAWFCounts
-	WHERE uidApplicationWorkflowStepId IN 
+	SELECT COUNT(AWSH8.uidId)AS 'WFS_Regretted'
+	FROM #tmpAWSHistory AWSH8
+	WHERE AWSH8.uidApplicationWorkflowStepId IN 
 	(
-		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Regretted'
+		SELECT AWS8.uidId FROM refApplicationWorkflowStep AWS8 WHERE AWS8.nvcName = 'Regretted'
 	)
-	AND uidRequisitionId = R.uidId
+	AND AWSH8.uidRequisitionId = REQ1.uidId
+	AND AWSH8.uidAgencyId = A.uidId
 ) AS 'WFS_Regretted',
 (
-	SELECT COUNT(AWFCount)AS 'WFS_Declined'
-	FROM #tmpAgencyApplicationsAWFCounts
-	WHERE uidApplicationWorkflowStepId IN 
+	SELECT COUNT(AWSH9.uidId)AS 'WFS_Declined'
+	FROM #tmpAWSHistory AWSH9
+	WHERE AWSH9.uidApplicationWorkflowStepId IN 
 	(
-		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Declined'
+		SELECT AWS9.uidId FROM refApplicationWorkflowStep AWS9 WHERE AWS9.nvcName = 'Declined'
 	)
-	AND uidRequisitionId = R.uidId
+	AND AWSH9.uidRequisitionId = REQ1.uidId
+	AND AWSH9.uidAgencyId = A.uidId
 ) AS 'WFS_Declined',
 (
-	SELECT COUNT(AWFCount)AS 'WFS_Withdrawn'
-	FROM #tmpAgencyApplicationsAWFCounts
+	SELECT COUNT(AWSH10.uidId)AS 'WFS_Withdrawn'
+	FROM #tmpAWSHistory AWSH10
 	WHERE uidApplicationWorkflowStepId IN 
 	(
-		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Withdrawn'
+		SELECT AWS10.uidId FROM refApplicationWorkflowStep AWS10 WHERE AWS10.nvcName = 'Withdrawn'
 	)
-	AND uidRequisitionId = R.uidId
+	AND AWSH10.uidRequisitionId = REQ1.uidId
+	AND AWSH10.uidAgencyId = A.uidId
 ) AS 'WFS_Withdrawn',
 (
-	SELECT intCountOfApplications 
-	FROM #tmpAgencyApplicationsByRace
-	WHERE nvcRace = 'Asian'
-	AND uidRequisitionId = R.uidId
-	AND uidAgencyId = A.uidId
+	SELECT AABR1.intCountOfApplications 
+	FROM #tmpAgencyApplicationsByRace AABR1
+	WHERE AABR1.nvcRace = 'Asian'
+	AND AABR1.uidRequisitionId = REQ1.uidId
+	AND AABR1.uidAgencyId = A.uidId
 ) AS 'Race Count - Asian',
 (
-	SELECT intCountOfApplications 
-	FROM #tmpAgencyApplicationsByRace
-	WHERE nvcRace = 'Black'
-	AND uidRequisitionId = R.uidId
-	AND uidAgencyId = A.uidId
+	SELECT AABR2.intCountOfApplications 
+	FROM #tmpAgencyApplicationsByRace AABR2
+	WHERE AABR2.nvcRace = 'Black'
+	AND AABR2.uidRequisitionId = REQ1.uidId
+	AND AABR2.uidAgencyId = A.uidId
 ) AS 'Race Count - Black',
 (
-	SELECT intCountOfApplications 
-	FROM #tmpAgencyApplicationsByRace
-	WHERE nvcRace = 'Coloured'
-	AND uidRequisitionId = R.uidId
-	AND uidAgencyId = A.uidId
+	SELECT AABR3.intCountOfApplications 
+	FROM #tmpAgencyApplicationsByRace AABR3
+	WHERE AABR3.nvcRace = 'Coloured'
+	AND AABR3.uidRequisitionId = REQ1.uidId
+	AND AABR3.uidAgencyId = A.uidId
 ) AS 'Race Count - Coloured',
 (
-	SELECT intCountOfApplications 
-	FROM #tmpAgencyApplicationsByRace
-	WHERE nvcRace = 'Indian / Asian'
-	AND uidRequisitionId = R.uidId
-	AND uidAgencyId = A.uidId
+	SELECT AABR4.intCountOfApplications 
+	FROM #tmpAgencyApplicationsByRace AABR4
+	WHERE AABR4.nvcRace = 'Indian / Asian'
+	AND AABR4.uidRequisitionId = REQ1.uidId
+	AND AABR4.uidAgencyId = A.uidId
 ) AS 'Race Count - Indian / Asian',
 (
-	SELECT intCountOfApplications 
-	FROM #tmpAgencyApplicationsByRace
-	WHERE nvcRace = 'White'
-	AND uidRequisitionId = R.uidId
-	AND uidAgencyId = A.uidId
+	SELECT AABR5.intCountOfApplications 
+	FROM #tmpAgencyApplicationsByRace AABR5
+	WHERE AABR5.nvcRace = 'White'
+	AND AABR5.uidRequisitionId = REQ1.uidId
+	AND AABR5.uidAgencyId = A.uidId
 ) AS 'Race Count - White'
 INTO #tmpAgencyAppsByJob
-FROM dtlRequisition R
-JOIN relAgencyRequisition AR
-ON R.uidId = AR.uidRequisitionId
-JOIN dtlAgency A
-ON AR.uidAgencyId = A.uidId 
-WHERE R.uidId IN
+FROM dtlRequisition REQ1 
+JOIN relAgencyRequisition AR ON REQ1.uidId = AR.uidRequisitionId
+JOIN dtlAgency A ON AR.uidAgencyId = A.uidId 
+WHERE REQ1.uidId IN
 (
-	SELECT uidRequisitionId
-	FROM #tmpRequisitionFilter
+	SELECT RF2.uidRequisitionId	FROM #tmpRequisitionFilter RF2
 )
 
 CREATE TABLE #tmpTemplateFields   
@@ -531,10 +539,12 @@ FROM
 JOIN #tmpRR_Result RRR
 ON RRR.uidRequisitionId = AABJ.uidRequisitionId
 
-
+DROP TABLE #tmpAgencyApplications
 DROP TABLE #tmpRequisitionFilter
 DROP TABLE #tmpAgencyApplicationsByRace
-DROP TABLE #tmpAgencyApplicationsAWFCounts	
+--DROP TABLE #tmpAgencyApplicationsAWFCounts
+DROP TABLE #tmpSequencedApplicationHistory
+DROP TABLE #tmpAWSHistory	
 DROP TABLE #tmpAgencyAppsByJob
 DROP TABLE #tmpTemplateFields
 DROP TABLE #tmpTFDupValues
