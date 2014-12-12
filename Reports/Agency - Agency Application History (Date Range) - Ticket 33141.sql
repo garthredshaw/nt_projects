@@ -1,5 +1,3 @@
--- Agency Application History (Date Range)
--- 20141209
 SET NOCOUNT ON
 SET DATEFORMAT DMY
 

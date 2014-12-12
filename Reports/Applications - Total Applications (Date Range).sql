@@ -1,3 +1,5 @@
+-- Total Applications (Date Range)
+-- 20141212
 SET NOCOUNT ON;
 SET DATEFORMAT DMY
 
@@ -8,6 +10,7 @@ CREATE TABLE #tmpReport_HiredCandidate
 	uidRequisitionId uniqueidentifier,
 	dteApplicationDate datetime,
 	uidApplicationWorkflowStepId uniqueidentifier,
+	nvcOrigin nvarchar(50),
 	dteCreationDate datetime,
 	nvcJobReferenceCode nvarchar(255),
 	nvcRequisitionJobStatus nvarchar(255),
@@ -40,6 +43,7 @@ INSERT INTO #tmpReport_HiredCandidate
 	uidRequisitionId,
 	dteApplicationDate,
 	uidApplicationWorkflowStepId,
+	nvcOrigin,
 	dteCreationDate,
 	nvcJobReferenceCode,
 	nvcRequisitionJobStatus,
@@ -70,6 +74,7 @@ APP.uidCandidateId,
 APP.uidRequisitionId,
 APP.dteApplicationDate,
 APP.uidApplicationWorkflowStepId,
+APP.nvcOrigin,
 REQ.dteCreationDate,
 REQ.nvcReferenceCode AS 'nvcJobReferenceCode',
 RWFS.nvcName AS 'nvcRequisitionJobStatus',
@@ -118,7 +123,7 @@ NULL as 'intTotalJobTat',
 	AND RR2.uidRequisitionId = APP.uidRequisitionId
 ) AS 'nvcJobOwner',
 (
-	SELECT WA.nvcHTTPAddress
+	SELECT TOP 1 WA.nvcHTTPAddress
 	FROM dtlCandidate C
 	JOIN refWebsite W
 	ON C.uidWebsiteId = W.uidId 
@@ -908,9 +913,9 @@ SELECT @nvcParameterDefinition = '
 
 TRUNCATE TABLE #tmpTFDupValues
 
-IF (EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLES 
-WHERE TABLE_SCHEMA = 'neptune_dynamic_objects' 
-AND  TABLE_NAME = 'relCandidateFieldValue_' + REPLACE(CAST(@SectionId As varchar(64)),'-','')))
+--IF (EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLES 
+--WHERE TABLE_SCHEMA = 'neptune_dynamic_objects' 
+--AND  TABLE_NAME = 'relCandidateFieldValue_' + REPLACE(CAST(@SectionId As varchar(64)),'-','')))
 BEGIN
 	WHILE @intCount <= (SELECT COUNT(*) FROM #tmpTemplateFields)
 	BEGIN
@@ -1116,6 +1121,7 @@ RHC.dteHiredDate AS 'Hired Date',
 RHC.nvcHiredBy AS 'Hired By',
 RHC.intApplicantTat AS 'Applicant TAT',
 RHC.intTimeToHire AS 'Time To Hire',
+RHC.nvcOrigin AS 'Application Origin',
 RHC.nvcAgencyName AS 'Agency Name',
 RFR.ReasonForRegret AS 'Reason For Regret',
 RFR.PreviousStep AS 'Reason For Regret Previous Step',

@@ -1,3 +1,5 @@
+-- Agency Snapshot (Last Month)
+-- 20141209
 SET NOCOUNT ON;
 
 SELECT APP.uidId AS uidApplicationId

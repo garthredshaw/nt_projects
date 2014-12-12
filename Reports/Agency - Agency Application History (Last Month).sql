@@ -1,3 +1,5 @@
+-- Agency Application History (Last Month)
+-- 20141209
 SET NOCOUNT ON
 
 SELECT RWA.uidRequisitionId

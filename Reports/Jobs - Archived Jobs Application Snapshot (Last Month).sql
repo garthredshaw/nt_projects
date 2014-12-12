@@ -1,3 +1,5 @@
+-- Archived Jobs Application Snapshot (Last Month)
+-- 20141209
 SET NOCOUNT ON
 
 SELECT REQ1.uidId AS 'uidRequisitionId',

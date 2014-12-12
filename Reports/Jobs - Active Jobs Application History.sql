@@ -1,3 +1,5 @@
+-- Active Jobs Application History
+-- 20141209
 SET NOCOUNT ON
 
 SELECT REQ1.uidId AS 'uidRequisitionId',
