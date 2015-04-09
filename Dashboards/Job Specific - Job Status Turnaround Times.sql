@@ -25,6 +25,7 @@ WHERE
 		AND
 		uidRequisitionId IN (SELECT uidRequisitionId FROM #tmpUserRequisitions)		
 )
+
 SELECT
 	'1' as series,
 	S1T.nvcTranslation as x,
