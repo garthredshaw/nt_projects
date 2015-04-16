@@ -1,7 +1,17 @@
+-- Jobs - Age of Active Job.sql
+-- Requirements
+-- ============
+-- Active = (Jobs where RWF step = Review and jobs where published = true)
+-- Age = (Days spent in steps where published = true + days spent in RWF step = review)
+-- Data context = user specific based on Job access level (AllRequisitions | AsssignedRequisitions)
+
 SET NOCOUNT ON;
 
+-- REMOVE NEXT LINE BEFORE DEPLOYING TO SYSTEM
+DECLARE @uidUserId uniqueidentifier = '3427F1F9-B3C3-4A14-9579-C82F5BAD73AF' --Ian
+
 			
-SELECT * INTO #tmpUserRequisitionWorkflowSteps
+SELECT uidId INTO #tmpUserRequisitionWorkflowSteps
 FROM refRequisitionWorkflowStep
 WHERE uidId IN 
 (
@@ -12,7 +22,7 @@ WHERE uidId IN
 AND bitPublished = 1
 OR uidId = '82288BB5-1977-4932-B035-70570820B4EF'
 
-SELECT * INTO #tmpUserRequisitions
+SELECT uidId INTO #tmpUserRequisitions
 FROM dtlRequisition
 WHERE uidId IN 
 (

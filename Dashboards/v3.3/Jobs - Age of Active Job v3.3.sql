@@ -8,7 +8,7 @@
 SET NOCOUNT ON;
 
 -- REMOVE NEXT LINE BEFORE DEPLOYING TO SYSTEM
-DECLARE @uidUserId uniqueidentifier = '3427F1F9-B3C3-4A14-9579-C82F5BAD73AF' --Ian
+DECLARE @uidUserId uniqueidentifier = '0EDC2E28-002E-4F3F-BCC7-21B44A54692B'
 
 			
 SELECT uidId INTO #tmpUserRequisitionWorkflowSteps
@@ -19,8 +19,7 @@ WHERE uidId IN
 	FROM relRequisitionWorkflowStepPermission 
 	WHERE uidRoleId IN (SELECT uidRoleId FROM relRoleMembership WHERE uidUserId = @uidUserId) 
 )
-AND bitPublished = 1
-OR uidId = '82288BB5-1977-4932-B035-70570820B4EF'
+AND uidId = 'DD84363C-D03D-46F1-9DD9-633806951E06' 
 
 SELECT uidId INTO #tmpUserRequisitions
 FROM dtlRequisition
@@ -40,19 +39,23 @@ OR uidRequisitionWorkflowStepId IN
 	SELECT uidId 
 	FROM #tmpUserRequisitionWorkflowSteps
 )
+AND uidId IN
+(
+	-- FILTER ONLY JOBS THAT ARE CURRENTLY PUBLISHED OR HAVE BEEN PREVIOUSLY PUBLISHED
+	SELECT uidRequisitionId FROM relRequisitionWebsite WHERE dteStartDate <= GETDATE()
+)
 	
-SELECT RWA.uidRequisitionId, DATEDIFF(dd, MIN(RWA.dteLandingDate), GETDATE()) AS intDaysActive
+SELECT RWH.uidRequisitionId, DATEDIFF(dd, MIN(RWH.dteLandingDate), GETDATE()) AS intDaysActive
 INTO #tmpRequisitionAgeSinceActive
 FROM refRequisitionWorkflowStep RWS
-JOIN relRequisitionWorkflowAction RWA
-ON RWS.uidId = RWA.uidRequisitionWorkflowStepId
-WHERE RWS.bitPublished = 1
-AND RWA.uidRequisitionId IN 
+JOIN relRequisitionWorkflowHistory RWH
+ON RWS.uidId = RWH.uidRequisitionWorkflowStepId
+WHERE RWH.uidRequisitionId IN 
 (
 	SELECT uidId
 	FROM #tmpUserRequisitions
 )
-GROUP BY RWA.uidRequisitionId
+GROUP BY RWH.uidRequisitionId
 	
 
 SELECT R.nvcReferenceCode AS 'Ref #'
