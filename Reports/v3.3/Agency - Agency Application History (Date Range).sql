@@ -1,7 +1,5 @@
 -- Agency Application History (Date Range)
 -- 20150416
--- '@FromDate'
--- '@ToDate'
 SET NOCOUNT ON
 SET DATEFORMAT DMY
 
@@ -10,8 +8,8 @@ INTO #tmpRequisitionFilter
 FROM relRequisitionWorkflowHistory RWH
 JOIN refRequisitionWorkflowStep RWS
 ON RWH.uidRequisitionWorkflowStepId = RWS.uidId
-WHERE CAST(FLOOR(CAST(RWH.dteLandingDate AS FLOAT))AS DATETIME) >= '01 Jan 2013'
-AND CAST(FLOOR(CAST(RWH.dteLandingDate AS FLOAT))AS DATETIME) <= '15 Apr 2015'
+WHERE CAST(FLOOR(CAST(RWH.dteLandingDate AS FLOAT))AS DATETIME) >= '@FromDate'
+AND CAST(FLOOR(CAST(RWH.dteLandingDate AS FLOAT))AS DATETIME) <= '@ToDate'
 AND RWH.uidRequisitionId IN 
 (
 	SELECT uidRequisitionId FROM relRequisitionWebsite WHERE dteStartDate <= GETDATE()
@@ -49,8 +47,8 @@ GROUP BY AC1.uidAgencyId, A2.uidRequisitionId, RDT1.nvcTranslation
 		*
 	FROM relApplicationWorkflowHistory AWH2
 	WHERE
-		CAST(FLOOR(CAST(AWH2.dteLandingDate AS FLOAT))AS DATETIME) >= '01 Jan 2013'
-		AND CAST(FLOOR(CAST(AWH2.dteLandingDate AS FLOAT))AS DATETIME) <= '16 Apr 2015' 
+		CAST(FLOOR(CAST(AWH2.dteLandingDate AS FLOAT))AS DATETIME) >= '@FromDate'
+		AND CAST(FLOOR(CAST(AWH2.dteLandingDate AS FLOAT))AS DATETIME) <= '@ToDate' 
 		AND AWH2.uidApplicationId IN (SELECT TAA1.uidApplicationId FROM #tmpAgencyApplications TAA1)		
 )
 

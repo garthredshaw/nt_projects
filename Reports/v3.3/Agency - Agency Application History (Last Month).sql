@@ -8,8 +8,8 @@ INTO #tmpRequisitionFilter
 FROM relRequisitionWorkflowHistory RWH
 JOIN refRequisitionWorkflowStep RWS
 ON RWH.uidRequisitionWorkflowStepId = RWS.uidId
-WHERE DATEPART(mm, RWA.dteLandingDate) = DATEPART(mm, DATEADD(mm, -1, GETDATE()))
-AND DATEPART(yyyy, RWA.dteLandingDate) = DATEPART(yyyy, DATEADD(mm, -1, GETDATE()))
+WHERE DATEPART(mm, RWH.dteLandingDate) = DATEPART(mm, DATEADD(mm, -1, GETDATE()))
+AND DATEPART(yyyy, RWH.dteLandingDate) = DATEPART(yyyy, DATEADD(mm, -1, GETDATE()))
 AND RWH.uidRequisitionId IN 
 (
 	SELECT uidRequisitionId FROM relRequisitionWebsite WHERE dteStartDate <= GETDATE()
@@ -33,8 +33,8 @@ FROM relApplication A2
 JOIN dtlCandidate C1 ON A2.uidCandidateId = C1.uidId 
 JOIN relCandidateSectionValue CSV1 ON C1.uidId = CSV1.uidCandidateId
 JOIN neptune_dynamic_objects.relCandidateFieldValue_CBAE5C2B870E48D0A8C280B713CEB2B4 CFV1 ON CSV1.uidId = CFV1.uidCandidateSectionValueId 
-JOIN refReferenceDataItem RDI1 ON CFV1.uidIdValue = RDI1.uidId AND CFV1.uidCandidateFieldId = '37EA1626-39FC-4B1E-83C1-4EDFE03D66E8' -- Race
-JOIN relReferenceDataTranslation RDT1 ON RDI1.uidId = RDT1.uidReferenceDataItemId AND RDT1.uidLanguageId = '4850874D-715B-4950-B188-738E2FFC1520' -- English
+JOIN refReferenceDataItem RDI1 ON CFV1.uidIdValue = RDI1.uidId AND CFV1.uidCandidateFieldId = '37EA1626-39FC-4B1E-83C1-4EDFE03D66E8' 
+JOIN relReferenceDataTranslation RDT1 ON RDI1.uidId = RDT1.uidReferenceDataItemId AND RDT1.uidLanguageId = '4850874D-715B-4950-B188-738E2FFC1520' 
 JOIN relAgencyCandidate AC1 ON C1.uidId = AC1.uidCandidateId 
 WHERE A2.uidId IN (SELECT uidApplicationId FROM #tmpAgencyApplications)
 GROUP BY AC1.uidAgencyId, A2.uidRequisitionId, RDT1.nvcTranslation 
@@ -546,7 +546,6 @@ ON RRR.uidRequisitionId = AABJ.uidRequisitionId
 DROP TABLE #tmpAgencyApplications
 DROP TABLE #tmpRequisitionFilter
 DROP TABLE #tmpAgencyApplicationsByRace
---DROP TABLE #tmpAgencyApplicationsAWFCounts
 DROP TABLE #tmpSequencedApplicationHistory
 DROP TABLE #tmpAWSHistory	
 DROP TABLE #tmpAgencyAppsByJob

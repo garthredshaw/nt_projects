@@ -2,7 +2,6 @@ SET NOCOUNT ON;
 
 DECLARE @uidUserId uniqueidentifier = '0EDC2E28-002E-4F3F-BCC7-21B44A54692B'
 DECLARE @uidLanguageId uniqueidentifier = '4850874D-715B-4950-B188-738E2FFC1520'
-DECLARE @intPeriod int = 12
 	
 SELECT * INTO #tmpUserRequisitionWorkflowSteps
 FROM refRequisitionWorkflowStep
@@ -57,7 +56,7 @@ INTO #tmpUserRequisitionsFinal
 FROM #tmpUserRequisitions	
 GROUP BY nvcName, nvcPublishedState	
 
-SELECT nvcStatus AS 'x', intCount AS 'y' FROM #tmpUserRequisitionsFinal
+SELECT '1' AS 'series', nvcStatus AS 'x', intCount AS 'y' FROM #tmpUserRequisitionsFinal
 	
 DROP TABLE #tmpUserRequisitionWorkflowSteps	
 DROP TABLE #tmpUserRequisitions

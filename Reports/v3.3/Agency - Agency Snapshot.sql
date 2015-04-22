@@ -26,9 +26,9 @@ ON C.uidId = CSV.uidCandidateId
 JOIN neptune_dynamic_objects.relCandidateFieldValue_CBAE5C2B870E48D0A8C280B713CEB2B4 CFV
 ON CSV.uidId = CFV.uidCandidateSectionValueId 
 JOIN refReferenceDataItem RDI
-ON CFV.uidIdValue = RDI.uidId AND CFV.uidCandidateFieldId = '37EA1626-39FC-4B1E-83C1-4EDFE03D66E8' -- Race
+ON CFV.uidIdValue = RDI.uidId AND CFV.uidCandidateFieldId = '37EA1626-39FC-4B1E-83C1-4EDFE03D66E8' 
 JOIN relReferenceDataTranslation RDT
-ON RDI.uidId = RDT.uidReferenceDataItemId AND RDT.uidLanguageId = '4850874D-715B-4950-B188-738E2FFC1520' -- English
+ON RDI.uidId = RDT.uidReferenceDataItemId AND RDT.uidLanguageId = '4850874D-715B-4950-B188-738E2FFC1520' 
 JOIN relAgencyCandidate AC 
 ON C.uidId = AC.uidCandidateId
 WHERE APP.uidId IN

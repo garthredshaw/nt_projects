@@ -48,7 +48,6 @@ INSERT INTO #tmpReport_HiredCandidate
 	nvcRequisitionJobStatus,
 	dteJobFirstAdvertised,
 	intDaysAdvertised,
-	--intDaysReview,
 	intDaysActive,
 	dteJobDateArchived,
 	intTotalJobTat,
@@ -84,7 +83,6 @@ RWFS.nvcName AS 'nvcRequisitionJobStatus',
 	ORDER BY dteStartDate
 ) AS 'dteJobFirstAdvertised',
 NULL AS 'intDaysAdvertised',
---NULL AS 'intDaysReview',
 NULL AS 'intDaysActive',
 (
 	SELECT TOP 1 BBB.dteLandingDate 
@@ -270,14 +268,12 @@ RWH.uidRequisitionId IN
 	SELECT uidRequisitionId 
 	FROM #tmpReport_HiredCandidate
 )
---AND RWS.nvcName = 'Active'
 order by uidRequisitionId, dteLandingDate
 
 UPDATE #tmpRequisitionWorkflowstepDays
 SET intStepDays = DATEDIFF(dd, dteStartDate, dteEndDate)
 
 
---888888888888888888888888888888888888888
 SELECT uidRequisitionId, 
 'Publishing' as 'nvcStatus',
 dteStartDate, 
@@ -308,19 +304,6 @@ LEFT JOIN
 ) B
 ON A.uidRequisitionId = B.uidRequisitionId 
 
---UPDATE #tmpReport_HiredCandidate
---SET intDaysReview = B.DaysReview
---FROM #tmpReport_HiredCandidate A
---LEFT JOIN 
---(
---	SELECT uidRequisitionId,
---	nvcStepStatus,
---	SUM(intStepDays) AS DaysReview
---	FROM #tmpRequisitionWorkflowstepDatesTotals
---	WHERE nvcStepStatus = 'Review'
---	GROUP BY uidRequisitionId, nvcStepStatus
---) B
---ON A.uidRequisitionId = B.uidRequisitionId 
 
 UPDATE #tmpReport_HiredCandidate
 SET intDaysActive = B.intStepDays
@@ -1061,7 +1044,6 @@ RHC.nvcJobOwner AS 'Job Owner',
 RHC.dteCreationDate AS 'Date Job Created',
 RHC.dteJobFirstAdvertised AS 'Date Job First Advertised',
 RHC.intDaysAdvertised AS 'Days Job Advertised',
---RHC.intDaysReview AS 'Days Job In Review',
 RHC.intDaysActive AS 'Days Job Active',
 RHC.dteJobDateArchived AS 'Date Job Archived',
 RHC.intTotalJobTat AS 'Total Job TAT in Days',
