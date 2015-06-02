@@ -1,6 +1,75 @@
 -- Active Jobs Application Snapshot
--- 20150416
+-- 20150528
 SET NOCOUNT ON
+
+DECLARE @tmpRequisitionWebsitesPublishedBeforeRange TABLE 
+(
+	uidId uniqueidentifier,
+	uidRequisitionId uniqueidentifier,
+	uidWebsiteId uniqueidentifier,
+	dteStartDate datetime,
+	dteEndDate datetime,
+	bitEndDateIndefinate bit,
+	enmCommunicationStatus int
+)	
+
+DECLARE @tmpRequisitionWebsitesPublishedDuring TABLE 
+(
+	uidId uniqueidentifier,
+	uidRequisitionId uniqueidentifier,
+	uidWebsiteId uniqueidentifier,
+	dteStartDate datetime,
+	dteEndDate datetime,
+	bitEndDateIndefinate bit,
+	enmCommunicationStatus int
+)	
+
+DECLARE @tmpRequisitionWebsitesPublishedAfterRange TABLE 
+(
+	uidId uniqueidentifier,
+	uidRequisitionId uniqueidentifier,
+	uidWebsiteId uniqueidentifier,
+	dteStartDate datetime,
+	dteEndDate datetime,
+	bitEndDateIndefinate bit,
+	enmCommunicationStatus int
+)		
+
+DECLARE @tmpRequisitionPublishingStatus TABLE 
+(	
+	uidRequisitionId uniqueidentifier,
+	nvcStatus nvarchar(max)
+)		
+
+DECLARE @dtePublishedDateFromFilter datetime
+DECLARE @dtePublishedDateToFilter datetime
+
+SELECT @dtePublishedDateFromFilter = DATEADD(second, -1, GETDATE()), @dtePublishedDateToFilter = DATEADD(second, -1, GETDATE())
+INSERT INTO @tmpRequisitionWebsitesPublishedBeforeRange EXEC custom_spRequisitionWebsiteFilterWithPublishingCriteria @enmPublishStatus=2, @dtePublishedDateFrom=@dtePublishedDateFromFilter, @dtePublishedDateTo=@dtePublishedDateToFilter
+
+SELECT @dtePublishedDateFromFilter = DATEADD(second, -1, GETDATE()), @dtePublishedDateToFilter = DATEADD(second, +1, GETDATE())
+INSERT INTO @tmpRequisitionWebsitesPublishedDuring EXEC custom_spRequisitionWebsiteFilterWithPublishingCriteria @enmPublishStatus=3, @dtePublishedDateFrom=@dtePublishedDateFromFilter, @dtePublishedDateTo=@dtePublishedDateToFilter
+
+SELECT @dtePublishedDateFromFilter = DATEADD(second, -1, GETDATE()), @dtePublishedDateToFilter = DATEADD(second, +1, GETDATE())
+INSERT INTO @tmpRequisitionWebsitesPublishedAfterRange EXEC custom_spRequisitionWebsiteFilterWithPublishingCriteria @enmPublishStatus=4, @dtePublishedDateFrom=@dtePublishedDateFromFilter, @dtePublishedDateTo=@dtePublishedDateToFilter
+
+INSERT INTO @tmpRequisitionPublishingStatus
+SELECT DISTINCT
+	UR.uidId,
+	CASE
+		WHEN CP.uidId IS NOT NULL THEN 'Currently Advertised'
+		WHEN (PP.uidId IS NOT NULL AND CP.uidId IS NULL) AND (CASE WHEN CRWFS.uidId IS NOT NULL THEN uidRequisitionWorkflowStepId END in(CRWFS.uidId)) THEN 'Previously Advertised'
+		WHEN (RW.uidId IS NULL OR (NYP.uidId IS NOT NULL AND CP.uidId IS NULL)) AND (CASE WHEN CRWFS.uidId IS NOT NULL THEN uidRequisitionWorkflowStepId END in (CRWFS.uidId)) THEN 'Not Yet Advertised' 	
+		ELSE 'None'
+	END AS PublishedState
+FROM 
+	dtlRequisition UR
+	LEFT OUTER JOIN relRequisitionWebsite RW on UR.uidId = RW.uidRequisitionId
+	LEFT OUTER JOIN @tmpRequisitionWebsitesPublishedAfterRange NYP ON UR.uidId = NYP.uidRequisitionId
+	LEFT OUTER JOIN @tmpRequisitionWebsitesPublishedDuring CP ON UR.uidId = CP.uidRequisitionId
+	LEFT OUTER JOIN @tmpRequisitionWebsitesPublishedBeforeRange PP ON UR.uidId = PP.uidRequisitionId
+	LEFT OUTER JOIN ((SELECT uidId FROM refRequisitionWorkflowStep WHERE bitIsCurrent = 1)) CRWFS ON UR.uidRequisitionWorkflowStepId = CRWFS.uidId
+
 
 SELECT REQ1.uidId AS 'uidRequisitionId',
 REQ1.nvcReferenceCode AS 'JobRefNo', 
@@ -157,7 +226,12 @@ REQ1.dteCreationDate AS 'DateJobCreated',
 		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Withdrawn'
 	)
 	AND uidRequisitionId = REQ1.uidId
-) AS 'WFS_Withdrawn'
+) AS 'WFS_Withdrawn',
+(
+	SELECT TOP 1 nvcStatus
+	FROM @tmpRequisitionPublishingStatus 
+	WHERE uidRequisitionId = REQ1.uidId	
+) AS nvcPublishingStatus
 INTO #tmpJobReportSnapshot1
 FROM dtlRequisition REQ1
 JOIN refRequisitionWorkflowStep RWS1
@@ -167,24 +241,17 @@ WHERE RWS1.uidId IN
 	SELECT uidId FROM refRequisitionWorkflowStep WHERE nvcName = 'Active'
 )
 
-
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-CREATE TABLE #tmpRequisitionWorkflowstepDays   
+DECLARE @tmpRequisitionWorkflowstepDays TABLE
 (
 	ID INT Identity(1,1),
 	uidRequisitionId uniqueidentifier,
 	nvcStepStatus nvarchar(50),
 	dteStartDate datetime,
 	dteEndDate datetime,
-	intStepDays int,
+	intStepDays int
 )
 
-INSERT INTO #tmpRequisitionWorkflowstepDays
+INSERT INTO @tmpRequisitionWorkflowstepDays
 (
 	uidRequisitionId,
 	nvcStepStatus,
@@ -196,35 +263,39 @@ RWH.uidRequisitionId,
 RWS.nvcName,
 RWH.dteLandingDate as dteStartDate,
 (
-	select top 1 dteLandingDate 
+	isnull((select top 1 dteLandingDate 
 	from relRequisitionWorkflowHistory 
 	where uidRequisitionId = RWH.uidRequisitionId 
 	and dteLandingDate > RWH.dteLandingDate 
-	order by dteLandingDate
+	order by dteLandingDate),getdate())
 ) as dteEndDate
 from relRequisitionWorkflowHistory RWH
 join refRequisitionWorkflowStep RWS on RWH.uidRequisitionWorkflowStepId = RWS.uidId
-WHERE RWH.uidRequisitionId IN 
-(
-	SELECT uidRequisitionId FROM relRequisitionWebsite WHERE dteStartDate <= GETDATE()
-)
-AND 
-RWH.uidRequisitionId IN
+WHERE RWH.uidRequisitionId IN
 (
 	SELECT uidRequisitionId 
 	FROM #tmpJobReportSnapshot1
 )
 order by uidRequisitionId, dteLandingDate
 
-UPDATE #tmpRequisitionWorkflowstepDays
+UPDATE @tmpRequisitionWorkflowstepDays
 SET intStepDays = DATEDIFF(dd, dteStartDate, dteEndDate)
 
+DECLARE @tmpPublishingDays TABLE
+(
+uidRequisitionId uniqueidentifier, 
+nvcStatus nvarchar(max),
+dteStartDate datetime, 
+dteEndDate datetime,
+intDaysPublished int
+)
+
+INSERT INTO @tmpPublishingDays
 SELECT uidRequisitionId, 
 'Publishing' as 'nvcStatus',
 dteStartDate, 
 dteEndDate,
 DATEDIFF(dd,dteStartDate, dteEndDate) AS 'intDaysPublished'
-INTO #tmpPublishingDays
 FROM relRequisitionWebsite
 WHERE uidRequisitionId IN
 (
@@ -232,12 +303,9 @@ WHERE uidRequisitionId IN
 	FROM #tmpJobReportSnapshot1
 )
 
-UPDATE #tmpPublishingDays
+UPDATE @tmpPublishingDays
 SET intDaysPublished = DATEDIFF(dd,dteStartDate, GETDATE())
 WHERE intDaysPublished IS NULL
-
-
--- ****************************************************************************************
 
 DECLARE @intCount int 
 
@@ -489,25 +557,19 @@ BEGIN
 	EXEC sp_executeSql @nvcSql
 END
 
--- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
--- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
--- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
--- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
--- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 UPDATE #tmpJobReportSnapshot1
 SET DaysJobAdvertised = ISNULL(B.DaysAdvertised, 0)
 FROM #tmpJobReportSnapshot1 A
 LEFT JOIN 
 (
 	SELECT uidRequisitionId, SUM(intDaysPublished) AS DaysAdvertised
-	FROM #tmpPublishingDays
+	FROM @tmpPublishingDays
 	GROUP BY uidRequisitionId
 ) B
 ON A.uidRequisitionId = B.uidRequisitionId 
 
 UPDATE #tmpJobReportSnapshot1
-SET TotalJobTAT = ISNULL(DATEDIFF(day,DateJobCreated,DateJobArchived), 0)
+SET TotalJobTAT = ISNULL(DATEDIFF(day,DateJobFirstAdvertised,DateJobArchived), 0)
 
 UPDATE #tmpJobReportSnapshot1
 SET DaysActive = ISNULL(B.intStepDays, 0)
@@ -515,7 +577,7 @@ FROM #tmpJobReportSnapshot1 A
 LEFT JOIN 
 (
 	SELECT uidRequisitionId, intStepDays
-	FROM #tmpRequisitionWorkflowstepDays
+	FROM @tmpRequisitionWorkflowstepDays
 ) B
 ON A.uidRequisitionId = B.uidRequisitionId 
 
@@ -523,12 +585,12 @@ SELECT JRS1.JobRefNo AS 'Job Reference Number',
 JRS1.JobStatus AS 'Job Status',
 JRS1.JobCreator AS 'Job Creator',
 JRS1.JobOwner AS 'Job Owner',
-JRS1.DateJobCreated AS 'Date Job Created',
-JRS1.DateJobFirstAdvertised AS 'Date Job First Advertised',
+CONVERT(varchar, JRS1.DateJobCreated, 106) AS 'Date Job Created',
+CONVERT(varchar, JRS1.DateJobFirstAdvertised, 106) AS 'Date Job First Advertised',
 JRS1.DaysJobAdvertised AS 'Days Job Advertised',
---JRS1.DaysInReview AS 'Days Job in Review',
+JRS1.nvcPublishingStatus AS 'Publishing Status',
 JRS1.DaysActive AS 'Days Job Active',
-JRS1.DateJobArchived AS 'Date Job Archived',
+CONVERT(varchar, JRS1.DateJobArchived, 106) AS 'Date Job Archived',
 JRS1.TotalJobTAT AS 'Total Job TAT in Days',
 JRS1.TotalApplications AS 'Total Applications',
 JRS1.WFS_Unprocessed AS 'Count Unprocessed',
@@ -543,13 +605,10 @@ JRS1.WFS_Declined AS 'Count Declined',
 JRS1.WFS_Withdrawn AS 'Count Withdrawn',
 RRR.*
 FROM #tmpJobReportSnapshot1 JRS1
-JOIN #tmpRR_Result RRR
-ON JRS1.uidRequisitionId = RRR.uidRequisitionId
+JOIN #tmpRR_Result RRR ON JRS1.uidRequisitionId = RRR.uidRequisitionId
 
 
 DROP TABLE #tmpJobReportSnapshot1
-DROP TABLE #tmpRequisitionWorkflowstepDays
-DROP TABLE #tmpPublishingDays
 DROP TABLE #tmpTemplateFields
 DROP TABLE #tmpTFDupValues
 DROP TABLE #tmpTFValues

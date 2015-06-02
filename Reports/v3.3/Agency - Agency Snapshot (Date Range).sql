@@ -3,14 +3,23 @@
 SET NOCOUNT ON;
 SET DATEFORMAT DMY
 
+DECLARE @tmpAgencyApplications TABLE
+(
+uidApplicationId uniqueidentifier,
+uidAgencyId uniqueidentifier,
+uidCandidateId uniqueidentifier,
+uidRequisitionId uniqueidentifier,
+nvcStatus nvarchar(max),
+dteApplicationDate datetime
+)
 
+INSERT INTO @tmpAgencyApplications
 SELECT APP.uidId AS uidApplicationId
 ,AC.uidAgencyId 
 ,APP.uidCandidateId
 ,APP.uidRequisitionId
 ,AWS.nvcName AS nvcStatus
 ,APP.dteApplicationDate
-INTO #tmpAgencyApplications
 FROM relApplication APP
 LEFT JOIN refApplicationWorkflowStep AWS ON APP.uidApplicationWorkflowStepId = AWS.uidId
 JOIN dtlCandidate C ON APP.uidCandidateId = C.uidId 
@@ -18,11 +27,17 @@ JOIN relAgencyCandidate AC ON C.uidId = AC.uidCandidateId
 WHERE CAST(FLOOR(CAST(APP.dteApplicationDate AS FLOAT))AS DATETIME) >= '@FromDate'
 AND CAST(FLOOR(CAST(APP.dteApplicationDate AS FLOAT))AS DATETIME) <= '@ToDate'
 
+DECLARE @tmpAgencyApplicationsByRace TABLE
+(
+uidAgencyId uniqueidentifier,
+nvcRace nvarchar(max),
+intCountOfApplications int
+)
 
+INSERT INTO @tmpAgencyApplicationsByRace
 SELECT AC.uidAgencyId AS uidAgencyId,
 RDT.nvcTranslation AS nvcRace,
 COUNT(APP.uidId)AS intCountOfApplications
-INTO #tmpAgencyApplicationsByRace
 FROM relApplication APP
 JOIN dtlCandidate C
 ON APP.uidCandidateId = C.uidId 
@@ -39,7 +54,7 @@ ON C.uidId = AC.uidCandidateId
 WHERE APP.uidId IN
 (
 	SELECT uidApplicationId
-	FROM #tmpAgencyApplications
+	FROM @tmpAgencyApplications
 ) 
 GROUP BY AC.uidAgencyId, RDT.nvcTranslation 
 
@@ -56,13 +71,13 @@ SELECT nvcName AS 'Agency Name',
 ) AS 'Total Allowable Apps',
 (
 	SELECT COUNT(AA.uidApplicationId) 
-	FROM #tmpAgencyApplications AA
+	FROM @tmpAgencyApplications AA
 	WHERE AA.uidAgencyId = dtlAgency.uidId 
 ) AS 'Total Apps Submitted',
 (
 	SELECT COUNT(AWH.uidId)
 	FROM relApplicationWorkflowHistory AWH
-	JOIN #tmpAgencyApplications AA
+	JOIN @tmpAgencyApplications AA
 	ON AWH.uidApplicationId = AA.uidApplicationId 
 	JOIN dtlCandidate C1
 	ON AA.uidCandidateId = C1.uidId 
@@ -76,100 +91,98 @@ SELECT nvcName AS 'Agency Name',
 ) AS 'Total Apps moved from Unprocessed to Regret',
 (	
 	SELECT COUNT(uidApplicationId) 
-	FROM #tmpAgencyApplications 
+	FROM @tmpAgencyApplications 
 	WHERE uidAgencyId = dtlAgency.uidId
 	AND nvcStatus = 'Unprocessed'
 ) AS 'Count Unprocessed',
 (	
 	SELECT COUNT(uidApplicationId) 
-	FROM #tmpAgencyApplications 
+	FROM @tmpAgencyApplications 
 	WHERE uidAgencyId = dtlAgency.uidId
 	AND nvcStatus = 'Longlist'
 ) AS 'Count Longlist',
 (	
 	SELECT COUNT(uidApplicationId) 
-	FROM #tmpAgencyApplications 
+	FROM @tmpAgencyApplications 
 	WHERE uidAgencyId = dtlAgency.uidId
 	AND nvcStatus = 'Shortlist'
 ) AS 'Count Shortlist',
 (	
 	SELECT COUNT(uidApplicationId) 
-	FROM #tmpAgencyApplications 
+	FROM @tmpAgencyApplications 
 	WHERE uidAgencyId = dtlAgency.uidId
 	AND nvcStatus = 'Interview'
 ) AS 'Count Interview',
 (	
 	SELECT COUNT(uidApplicationId) 
-	FROM #tmpAgencyApplications 
+	FROM @tmpAgencyApplications 
 	WHERE uidAgencyId = dtlAgency.uidId
 	AND nvcStatus = 'Under Review'
 ) AS 'Count Under Review',
 (	
 	SELECT COUNT(uidApplicationId) 
-	FROM #tmpAgencyApplications 
+	FROM @tmpAgencyApplications 
 	WHERE uidAgencyId = dtlAgency.uidId
 	AND nvcStatus = 'Offer Made'
 ) AS 'Count Offer Made',
 (	
 	SELECT COUNT(uidApplicationId) 
-	FROM #tmpAgencyApplications 
+	FROM @tmpAgencyApplications 
 	WHERE uidAgencyId = dtlAgency.uidId
 	AND nvcStatus = 'Hired'
 ) AS 'Count Hired',
 (	
 	SELECT COUNT(uidApplicationId) 
-	FROM #tmpAgencyApplications 
+	FROM @tmpAgencyApplications 
 	WHERE uidAgencyId = dtlAgency.uidId
 	AND nvcStatus = 'Regretted'
 ) AS 'Count Regretted',
 (	
 	SELECT COUNT(uidApplicationId) 
-	FROM #tmpAgencyApplications 
+	FROM @tmpAgencyApplications 
 	WHERE uidAgencyId = dtlAgency.uidId
 	AND nvcStatus = 'Declined'
 ) AS 'Count Declined',
 (	
 	SELECT COUNT(uidApplicationId) 
-	FROM #tmpAgencyApplications 
+	FROM @tmpAgencyApplications 
 	WHERE uidAgencyId = dtlAgency.uidId
 	AND nvcStatus = 'Withdrawn'
 ) AS 'Count Withdrawn',
 (
 	SELECT intCountOfApplications 
-	FROM #tmpAgencyApplicationsByRace
+	FROM @tmpAgencyApplicationsByRace
 	WHERE nvcRace = 'Asian'
 	AND uidAgencyId = dtlAgency.uidId
 ) AS 'Race Count - Asian',
 (
 	SELECT intCountOfApplications 
-	FROM #tmpAgencyApplicationsByRace
+	FROM @tmpAgencyApplicationsByRace
 	WHERE nvcRace = 'Black'
 	AND uidAgencyId = dtlAgency.uidId
 ) AS 'Race Count - Black',
 (
 	SELECT intCountOfApplications 
-	FROM #tmpAgencyApplicationsByRace
+	FROM @tmpAgencyApplicationsByRace
 	WHERE nvcRace = 'Coloured'
 	AND uidAgencyId = dtlAgency.uidId
 ) AS 'Race Count - Coloured',
 (
 	SELECT intCountOfApplications 
-	FROM #tmpAgencyApplicationsByRace
+	FROM @tmpAgencyApplicationsByRace
 	WHERE nvcRace = 'Indian / Asian'
 	AND uidAgencyId = dtlAgency.uidId
 ) AS 'Race Count - Indian / Asian',
 (
 	SELECT intCountOfApplications 
-	FROM #tmpAgencyApplicationsByRace
+	FROM @tmpAgencyApplicationsByRace
 	WHERE nvcRace = 'White'
 	AND uidAgencyId = dtlAgency.uidId
 ) AS 'Race Count - White'
 FROM dtlAgency
 WHERE uidId IN
 (
-	SELECT uidAgencyId FROM #tmpAgencyApplications
+	SELECT uidAgencyId FROM @tmpAgencyApplications
 )
 ORDER BY nvcName 
 
-DROP TABLE #tmpAgencyApplications
-DROP TABLE #tmpAgencyApplicationsByRace
