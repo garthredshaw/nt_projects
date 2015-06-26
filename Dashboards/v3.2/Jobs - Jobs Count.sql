@@ -1,5 +1,9 @@
 SET NOCOUNT ON;
 
+-- REMOVE NEXT LINE BEFORE DEPLOYING TO SYSTEM
+DECLARE @uidUserId uniqueidentifier = '0EDC2E28-002E-4F3F-BCC7-21B44A54692B'
+
+
 SELECT * INTO #tmpUserRequisitionWorkflowSteps
 FROM refRequisitionWorkflowStep
 WHERE uidId IN 

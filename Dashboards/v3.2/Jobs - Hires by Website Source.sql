@@ -1,3 +1,6 @@
+-- Jobs - Hires by Website Source.sql
+-- 20150507
+-- Count the candidates hired by Website souce. Filer by recruiter user
 SET NOCOUNT ON;  
 
 SELECT uidId INTO #tmpUserApplicationWorkflowSteps 

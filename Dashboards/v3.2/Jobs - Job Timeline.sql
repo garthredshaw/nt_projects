@@ -1,4 +1,12 @@
+-- Jobs - Job Timeline.sql
+-- 20150507
+-- Count the total jobs created per month for the past 12 months based 
+-- on their "first published" date, filter by recruiter user
 SET NOCOUNT ON;
+
+DECLARE @uidUserId uniqueidentifier = '0EDC2E28-002E-4F3F-BCC7-21B44A54692B'
+DECLARE @intPeriod int = 12
+
 
 CREATE TABLE #tmpTimeLine
 (
@@ -17,8 +25,9 @@ BEGIN
 
 	SELECT @intCount = @intCount + 1
 END
-			
-SELECT * INTO #tmpUserRequisitionWorkflowSteps
+-- End build timeline data
+		
+SELECT uidId INTO #tmpUserRequisitionWorkflowSteps
 FROM refRequisitionWorkflowStep
 WHERE uidId IN 
 (
@@ -27,12 +36,29 @@ WHERE uidId IN
 	WHERE uidRoleId IN (SELECT uidRoleId FROM relRoleMembership WHERE uidUserId = @uidUserId) 
 )
 
-SELECT * INTO #tmpUserRequisitions
-FROM dtlRequisition
-WHERE
-	uidId IN (SELECT uidRequisitionId FROM relRecruiterRequisition WHERE uidRecruiterId IN (SELECT uidId FROM dtlRecruiter WHERE uidUserId = @uidUserId))
-	OR
-	uidRequisitionWorkflowStepId IN (SELECT uidId FROM #tmpUserRequisitionWorkflowSteps)
+SELECT uidId,
+(
+	select top 1 dteStartDate 
+	from relRequisitionWebsite 
+	where uidRequisitionId = R.uidId 
+	order by dteStartDate
+) as dteFirstPublished
+INTO #tmpUserRequisitions
+FROM dtlRequisition R
+WHERE uidId IN 
+(
+	SELECT uidRequisitionId FROM relRequisitionWebsite WHERE dteStartDate <= GETDATE()
+)
+AND uidId IN
+(
+	SELECT uidRequisitionId FROM relRecruiterRequisition WHERE uidRecruiterId IN 
+	(
+		SELECT uidId FROM dtlRecruiter WHERE uidUserId = @uidUserId
+	)
+)
+OR
+uidRequisitionWorkflowStepId IN (SELECT uidId FROM #tmpUserRequisitionWorkflowSteps)
+	
 	
 --Requisition Timeline
 SELECT
@@ -44,15 +70,15 @@ FROM
 	LEFT JOIN 		
 	(
 		SELECT
-			MONTH(dteCreationDate) as intMonth,
-			YEAR(dteCreationDate) intYear,
+			MONTH(dteFirstPublished) as intMonth,
+			YEAR(dteFirstPublished) intYear,
 			COUNT(*) as intRequisitions
 		FROM
 			#tmpUserRequisitions
 		WHERE
-			dteCreationDate > '1 ' + DATENAME(month, (DATEADD(month, 0-@intPeriod, GETDATE()))) + ' ' + CAST(YEAR(DATEADD(month, 0-@intPeriod, GETDATE())) as nvarchar)
+			dteFirstPublished > '1 ' + DATENAME(month, (DATEADD(month, 0-@intPeriod, GETDATE()))) + ' ' + CAST(YEAR(DATEADD(month, 0-@intPeriod, GETDATE())) as nvarchar)
 		GROUP BY
-			MONTH(dteCreationDate), YEAR(dteCreationDate)
+			MONTH(dteFirstPublished), YEAR(dteFirstPublished)
 	) as CTL ON TL.intMonth = CTL.intMonth AND TL.intYear = CTL.intYear
 ORDER BY
 	TL.intYear, TL.intMonth		

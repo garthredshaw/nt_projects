@@ -1,3 +1,7 @@
+-- Home: Application Timeline.sql
+-- 20150507
+-- Display the number of candidate applications by month for the past year, filtered by user.
+
 SET NOCOUNT ON;  
 
 CREATE TABLE #tmpTimeLine (intMonth int, intYear int)  

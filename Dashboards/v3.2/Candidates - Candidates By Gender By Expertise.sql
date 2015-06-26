@@ -1,3 +1,6 @@
+-- Candidates - Candidates By Gender By Expertise.sql
+-- 20150507
+-- Count total candidates by "Gender" and by "Expertise"  (pivot)
 SET NOCOUNT ON;
 
 DECLARE @nvcSql nvarchar(4000)

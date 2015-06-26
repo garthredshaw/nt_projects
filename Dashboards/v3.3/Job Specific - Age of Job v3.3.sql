@@ -7,7 +7,7 @@
 
 SET NOCOUNT ON;
 
-DECLARE @uidRequisitionId uniqueidentifier = 'A8941721-0591-434A-A676-741EEC568BB5'
+DECLARE @uidRequisitionId uniqueidentifier = 'E4EFE966-796F-4304-B09E-0039B7EC117E'
 
 
 CREATE TABLE #tmpRequisitionWorkflowstepDates   
@@ -51,8 +51,8 @@ SET intStepDays = DATEDIFF(dd, dteStartDate , GETDATE())
 WHERE dteEndDate IS NULL
 
 
-SELECT SUM(intStepDays) AS 'Age (Days)' 
+SELECT '#AGEJOB#' as tag, SUM(intStepDays) AS value
 FROM #tmpRequisitionWorkflowstepDates
-select * from #tmpRequisitionWorkflowstepDates
+
 
 DROP TABLE #tmpRequisitionWorkflowstepDates

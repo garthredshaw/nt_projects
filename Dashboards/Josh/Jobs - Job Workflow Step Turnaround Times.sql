@@ -1,22 +1,25 @@
+-- Jobs - Job Workflow Turnaround Times.sql
+-- 20150507
+-- Shows the average days jobs spent in each RWF filtered 
+-- by the RWF or the requisitions the user has access to.
+-- Excudes New/Draft, Review, Library, Sourcing, Trash, Archived.
+
 SET NOCOUNT ON;
 
-declare @uidUserId uniqueidentifier = 'DC7B875D-BE65-42E8-AF96-6AAC55FB68C1'
-declare @uidLanguageId uniqueidentifier ='4850874D-715B-4950-B188-738E2FFC1520'
-declare @uidRequisitionId uniqueidentifier = 'E4EFE966-796F-4304-B09E-0039B7EC117D'
-declare @intPeriod int = 12
+DECLARE @uidUserId uniqueidentifier = '0EDC2E28-002E-4F3F-BCC7-21B44A54692B'
+DECLARE @uidLanguageId uniqueidentifier = '4850874D-715B-4950-B188-738E2FFC1520'
+DECLARE @intPeriod int = 12
+
 
 SELECT * INTO #tmpUserRequisitionWorkflowSteps
 FROM refRequisitionWorkflowStep
 WHERE uidId IN (SELECT uidRequisitionWorkflowStepId FROM relRequisitionWorkflowStepPermission WHERE uidRoleId IN (SELECT uidRoleId FROM relRoleMembership WHERE uidUserId = @uidUserId))AND uidID NOT IN ('5A67B6EC-2576-4A1C-9356-3C5C0A235245','77052EE6-A45E-4C2C-BFEF-9C34F47E1F67','82288BB5-1977-4932-B035-70570820B4EF','5CFBBA0A-EAB9-45E5-A9AF-8AF292B0AAD4','67A567F0-196B-4868-BE56-CCD2800C3051','8C49E81E-B43B-4502-9921-F9EF8E84546A')
-SELECT * INTO #tmpUserRequisitions FROM dtlRequisition 
-WHERE uidId = @uidRequisitionId
+SELECT * INTO #tmpUserRequisitions FROM dtlRequisition WHERE uidId IN(SELECT uidRequisitionId FROM relRecruiterRequisition WHERE uidRecruiterId IN (SELECT uidId FROM dtlRecruiter WHERE uidUserId = @uidUserId))OR	uidRequisitionWorkflowStepId IN (SELECT uidId FROM #tmpUserRequisitionWorkflowSteps)
 ;WITH sequencedRequisitionHistory AS 
 (
 	SELECT ROW_NUMBER() OVER (ORDER BY uidRequisitionId, dteLandingDate) as intOrder,*
 	FROM relRequisitionWorkflowHistory
-	WHERE uidRequisitionId = @uidRequisitionId
-	AND dteLandingDate > '1 '+DATENAME(month,(DATEADD(month,0-@intPeriod,GETDATE())))+' '+CAST(YEAR(DATEADD(month,0-@intPeriod,GETDATE()))As nvarchar) 
-	--AND uidRequisitionId IN(SELECT uidRequisitionId FROM #tmpUserRequisitions)		
+	WHERE dteLandingDate > '1 '+DATENAME(month,(DATEADD(month,0-@intPeriod,GETDATE())))+' '+CAST(YEAR(DATEADD(month,0-@intPeriod,GETDATE()))As nvarchar) AND uidRequisitionId IN(SELECT uidRequisitionId FROM #tmpUserRequisitions)		
 )
 SELECT C.series,C.x,C.y FROM
 (
@@ -34,7 +37,7 @@ SELECT C.series,C.x,C.y FROM
 		S1.uidId, S1T.nvcTranslation, S1.nvcName, S1.intSortOrder	
 	UNION
 	SELECT'1','Advertised',AVG(ISNULL((CAST(DATEDIFF(DAY, RW.dteStartDate, RW.dteEndDate) as float)),-0)) as y,4
-	FROM relRequisitionWebsite RW WHERE uidRequisitionId = @uidRequisitionId
+	FROM relRequisitionWebsite RW	
 	UNION
 	SELECT'1','Not Yet Advertised',AVG(ISNULL((CAST(CASE WHEN DATEDIFF(DAY,H1.dteLandingDate,RW.dteStartDate)< 1 THEN 0 ELSE DATEDIFF(DAY,H1.dteLandingDate,RW.dteStartDate)END as float)),-0)),3
 	FROM

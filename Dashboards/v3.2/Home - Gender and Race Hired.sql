@@ -30,6 +30,7 @@ SELECT @uidRowsSectionId = uidCandidateSectionId
 FROM refCandidateField 
 WHERE uidId = @uidRowsFieldId  
 
+--#tmpUserApplicationWorkflowSteps 
 SELECT uidId  
 INTO #tmpUserApplicationWorkflowSteps 
 FROM refApplicationWorkflowStep 
@@ -43,6 +44,7 @@ AND uidId IN
 	(SELECT uidRoleId FROM relRoleMembership WHERE uidUserId = @uidUserId)
 )
 
+--#tmpUserApplications
 SELECT uidId, uidCandidateId INTO #tmpUserApplications 
 FROM relApplication 
 WHERE uidApplicationWorkflowStepId IN  

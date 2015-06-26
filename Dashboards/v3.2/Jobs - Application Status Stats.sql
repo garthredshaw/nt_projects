@@ -1,4 +1,11 @@
+-- Jobs - Application status stats.sql
+-- 20150507
+-- Count applications in each AWF step, filter by recruiter user
 SET NOCOUNT ON;
+
+DECLARE @uidUserId uniqueidentifier = '0EDC2E28-002E-4F3F-BCC7-21B44A54692B'
+DECLARE @uidLanguageId uniqueidentifier = '4850874D-715B-4950-B188-738E2FFC1520'
+DECLARE @intPeriod int = 12
 		
 SELECT * INTO #tmpUserApplicationWorkflowSteps
 FROM refApplicationWorkflowStep

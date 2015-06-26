@@ -1,5 +1,7 @@
 SET NOCOUNT ON;  
 
+DECLARE @uidUserId uniqueIdentifier = '0EDC2E28-002E-4F3F-BCC7-21B44A54692B'
+
 SELECT uidId INTO #tmpUserApplicationWorkflowSteps 
 FROM refApplicationWorkflowStep WHERE uidId IN  
 (  

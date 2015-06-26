@@ -7,43 +7,41 @@
 
 SET NOCOUNT ON;
 
+DECLARE @varLastPublishedDate datetime
+
 -- REMOVE NEXT LINE BEFORE DEPLOYING TO SYSTEM
-DECLARE @uidUserId uniqueidentifier = '3427F1F9-B3C3-4A14-9579-C82F5BAD73AF' --Ian
-DECLARE @uidRequisitionId uniqueidentifier = 'CBA0C484-9DD6-4B3C-A9C1-007E7B4F3494'
+DECLARE @uidUserId uniqueidentifier = '0EDC2E28-002E-4F3F-BCC7-21B44A54692B' --GR
+DECLARE @uidRequisitionId uniqueidentifier = 'E4EFE966-796F-4304-B09E-0039B7EC117E'
 			
-SELECT uidId INTO #tmpUserRequisitionWorkflowSteps
-FROM refRequisitionWorkflowStep
-WHERE uidId IN 
-(
-	SELECT uidRequisitionWorkflowStepId 
-	FROM relRequisitionWorkflowStepPermission 
-	WHERE uidRoleId IN (SELECT uidRoleId FROM relRoleMembership WHERE uidUserId = @uidUserId) 
-)
-AND bitPublished = 1
-OR uidId = '82288BB5-1977-4932-B035-70570820B4EF'
 
-SELECT uidId INTO #tmpUserRequisitions
-FROM dtlRequisition
-WHERE uidId = @uidRequisitionId 
+SELECT R.uidId AS uidRequisitionId, RW.dteStartDate, RW.dteEndDate, DATEDIFF(dd, RW.dteStartDate, RW.dteEndDate) AS intDays
+INTO #tmpRequisitionAgeDays
+FROM dtlRequisition R
+JOIN relRequisitionWebsite RW ON R.uidId = RW.uidRequisitionId
+WHERE R.uidId = @uidRequisitionId
+AND dteStartDate IS NOT NULL
 
-	
-SELECT RWA.uidRequisitionId, DATEDIFF(dd, MIN(RWA.dteLandingDate), GETDATE()) AS intDaysActive
-INTO #tmpRequisitionAgeSinceActive
-FROM refRequisitionWorkflowStep RWS
-JOIN relRequisitionWorkflowAction RWA
-ON RWS.uidId = RWA.uidRequisitionWorkflowStepId
-WHERE RWS.bitPublished = 1
-AND RWA.uidRequisitionId IN 
-(
-	SELECT uidId
-	FROM #tmpUserRequisitions
-)
-GROUP BY RWA.uidRequisitionId
-	
+UPDATE #tmpRequisitionAgeDays
+SET dteEndDate = GETDATE(),
+intDays = DATEDIFF(dd, dteStartDate, GETDATE())
+WHERE dteEndDate IS NULL
 
-SELECT intDaysActive AS 'Age (days)'
-FROM #tmpRequisitionAgeSinceActive
+SELECT @varLastPublishedDate = (SELECT TOP 1 dteEndDate FROM #tmpRequisitionAgeDays ORDER BY dteEndDate DESC)
 
-DROP TABLE #tmpUserRequisitionWorkflowSteps
-DROP TABLE #tmpUserRequisitions
-DROP TABLE #tmpRequisitionAgeSinceActive
+INSERT INTO #tmpRequisitionAgeDays (uidRequisitionId, dteStartDate, dteEndDate,  intDays)
+SELECT uidRequisitionId, @varLastPublishedDate, dteLandingDate, 0 
+FROM relRequisitionWorkflowHistory 
+WHERE uidRequisitionId = @uidRequisitionId
+AND uidRequisitionWorkflowStepId = '8C49E81E-B43B-4502-9921-F9EF8E84546A'
+
+UPDATE #tmpRequisitionAgeDays
+SET dteEndDate = GETDATE(),
+intDays = DATEDIFF(dd, dteStartDate, GETDATE())
+WHERE dteEndDate IS NULL
+
+
+SELECT '#AGEJOB#' as tag, SUM(intDays) as value
+FROM #tmpRequisitionAgeDays
+GROUP BY uidRequisitionId 
+
+DROP TABLE #tmpRequisitionAgeDays

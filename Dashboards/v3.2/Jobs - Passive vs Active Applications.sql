@@ -1,3 +1,8 @@
+-- Jobs - Passive vs Active Applications.sql
+-- 20150507
+-- Count the total candidates, candidates who have not applied for any jobs, 
+-- and candidates who have applied for at least one job.
+
 SELECT 'All Candidates' as Type,  
 COUNT(*) as Total 
 FROM dtlCandidate  

@@ -1,6 +1,3 @@
--- Jobs - Application Turnaround Times.sql
--- 20150507
--- Count the time in days each application has spent in each AWF step, filter by recruiter user
 SET NOCOUNT ON;
 		
 SELECT * INTO #tmpUserApplicationWorkflowSteps

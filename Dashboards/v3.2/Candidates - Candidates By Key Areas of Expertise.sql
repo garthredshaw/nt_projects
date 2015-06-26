@@ -1,3 +1,7 @@
+-- Candidates - Candidates By Key Area of Expertise.sql
+-- 20150507
+-- Show candidates by their "Key Area of Expertise"
+
 SET NOCOUNT ON;
 
 SELECT

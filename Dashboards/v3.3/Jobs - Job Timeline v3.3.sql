@@ -11,8 +11,9 @@ CREATE TABLE #tmpTimeLine
 )
 
 DECLARE @dtePeriodDate datetime
-DECLARE @intCount int = 1
--- Build timeline data
+DECLARE @intCount int
+SELECT @intCount = 0
+
 WHILE @intCount < @intPeriod
 BEGIN
 	SELECT @dtePeriodDate = DATEADD(month, 0 - @intCount, GETDATE())

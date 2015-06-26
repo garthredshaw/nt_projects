@@ -1,3 +1,6 @@
+-- Candidates - Candidates By Province.sql
+-- 20150507
+-- Show candidates by their "Province"
 SET NOCOUNT ON;
 
 SELECT

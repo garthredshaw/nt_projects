@@ -1,4 +1,6 @@
-SET NOCOUNT ON;  
+-- Jobs - Hires by Gender and Race.sql
+-- 20150507
+-- Count the candidates hired, pivoting on Gender and Race. Filer by recruiter user
 
 DECLARE @nvcSql nvarchar(4000)  
 DECLARE @uidColumnsFieldId uniqueidentifier 
@@ -18,17 +20,33 @@ SELECT @uidRowsSectionId = uidCandidateSectionId
 FROM refCandidateField 
 WHERE uidId = @uidRowsFieldId  
 
-SELECT uidId INTO #tmpUserApplicationWorkflowSteps 
+--#tmpUserApplicationWorkflowSteps
+SELECT uidId 
+INTO #tmpUserApplicationWorkflowSteps 
 FROM refApplicationWorkflowStep 
 WHERE uidId = 'D48D37A6-FF45-4A2A-B6C4-C87FE3123809' 
 OR uidId = '9AE8ECCF-5C79-49C8-BD38-E548401CD56C'     
 
-SELECT uidId, uidCandidateId INTO #tmpUserApplications 
+--#tmpUserApplications
+SELECT uidId, uidCandidateId 
+INTO #tmpUserApplications 
 FROM relApplication 
 WHERE uidApplicationWorkflowStepId IN  
-	(SELECT uidId FROM #tmpUserApplicationWorkflowSteps)  
-	
-	
+(
+	SELECT uidId FROM #tmpUserApplicationWorkflowSteps
+)
+OR uidRequisitionId IN
+(
+	SELECT uidRequisitionId 
+	FROM relRecruiterRequisition 
+	WHERE uidRecruiterId IN 
+	(
+		SELECT uidId 
+		FROM dtlRecruiter 
+		WHERE uidUserId = @uidUserId
+	)
+)	
+		
 SELECT @nvcSql = ' SELECT * FROM 
 (  
 	SELECT RIT_G.nvcTranslation as Gender,   
