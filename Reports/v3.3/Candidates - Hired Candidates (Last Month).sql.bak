@@ -1,4 +1,4 @@
--- Total Applications (By Ref No)
+-- Hired Candidates (Last Month)
 -- 20150707
 SET NOCOUNT ON;
 SET DATEFORMAT DMY
@@ -16,7 +16,6 @@ CREATE TABLE #tmpReport_HiredCandidate
 	nvcRequisitionJobStatus nvarchar(255),
 	dteJobFirstAdvertised datetime,
 	intDaysAdvertised int,
-	intDaysReview int,
 	intDaysActive int,
 	dteJobDateArchived datetime,
 	intTotalJobTat int,
@@ -67,7 +66,6 @@ INSERT INTO #tmpReport_HiredCandidate
 	nvcCandidateEmail,
 	nvcCandidateMobileNumber
 )
-
 SELECT APP.uidId AS uidApplicationId,
 APP.uidCandidateId,
 APP.uidRequisitionId,
@@ -91,6 +89,7 @@ NULL AS 'intDaysActive',
 	JOIN relRequisitionWorkflowHistory BBB
 	ON AAA.uidId = BBB.uidRequisitionWorkflowStepId
 	WHERE AAA.nvcName = 'Archived'
+	AND BBB.uidRequisitionId NOT IN (SELECT uidId FROM dtlRequisition WHERE uidRequisitionWorkflowStepId = 'DD84363C-D03D-46F1-9DD9-633806951E06')
 	AND BBB.uidRequisitionId = APP.uidRequisitionId
 ) AS 'dteJobDateArchived',
 NULL as 'intTotalJobTat',
@@ -208,33 +207,19 @@ JOIN dtlRequisition REQ
 ON APP.uidRequisitionId = REQ.uidId 
 JOIN refRequisitionWorkflowStep RWFS
 ON REQ.uidRequisitionWorkflowStepId = RWFS.uidId
-WHERE REQ.nvcReferenceCode = '@Text'
-
-DECLARE @tmpReasonForRegret TABLE
+WHERE APP.uidId IN 
 (
-uidApplicationId uniqueidentifier, 
-ReasonForRegret nvarchar(max), 
-PreviousStep nvarchar(max)
+	SELECT A.uidId 
+	FROM relApplication A
+	JOIN relApplicationWorkflowHistory AWH
+	ON A.uidId = AWH.uidApplicationId 
+	AND AWH.uidApplicationWorkflowStepId IN 
+	(
+		SELECT uidId FROM refApplicationWorkflowStep WHERE nvcName = 'Hired'
+	)
+	WHERE DATEPART(mm, AWH.dteLandingDate) = DATEPART(mm, DATEADD(mm, -1, GETDATE()))
+	AND DATEPART(yyyy, AWH.dteLandingDate) = DATEPART(yyyy, DATEADD(mm, -1, GETDATE()))
 )
-
-INSERT INTO @tmpReasonForRegret
-SELECT DISTINCT A.uidId AS 'uidApplicationId', 
-AWPR.nvcName AS 'ReasonForRegret', 
-AWS.nvcName AS 'PreviousStep'
-FROM relApplication A
-JOIN (
-	SELECT AWH1.* FROM relApplicationWorkflowHistory AWH1
-	LEFT OUTER JOIN relApplicationWorkflowHistory AWH2 
-	ON AWH1.uidApplicationId = AWH2.uidApplicationId AND AWH1.dteLandingDate < AWH2.dteLandingDate
-	WHERE AWH2.uidApplicationId IS NULL 
-) AWH 
-ON A.uidId = AWH.uidApplicationId 
-JOIN refApplicationWorkflowPathReason AWPR ON AWH.uidApplicationWorkflowPathReasonId = AWPR.uidId 
-JOIN relApplicationWorkflowPath AWP ON AWH.uidApplicationWorkflowPathId = AWP.uidId 
-JOIN refApplicationWorkflowStep AWS ON AWP.uidApplicationWorkflowStepId_FromStepId = AWS.uidId 
-LEFT OUTER JOIN relApplicationNote AN on A.uidId = AN.uidApplicationId 
-WHERE AWH.uidApplicationWorkflowStepId = 'E5B81DEC-649E-478B-AE44-47C33B43ED87'
-AND A.uidId IN (SELECT uidApplicationId FROM #tmpReport_HiredCandidate)
 
 -- START REQUISITION PUBLISHING DAYS CALCULATIONS
 DECLARE @tmpRequisitionPublishedDaysCount TABLE
@@ -314,7 +299,6 @@ SET @i = @i + 1
 END
 -- END REQUISITION PUBLISHING DAYS CALCULATIONS
 
-
 DECLARE @tmpRequisitionWorkflowstepDays TABLE
 (
 	ID INT Identity(1,1),
@@ -332,23 +316,23 @@ INSERT INTO @tmpRequisitionWorkflowstepDays
 	dteStartDate,
 	dteEndDate
 )
-select distinct
+select
 RWH.uidRequisitionId,
 RWS.nvcName,
 RWH.dteLandingDate as dteStartDate,
 (
-	select top 1 dteLandingDate 
+	isnull((select top 1 dteLandingDate 
 	from relRequisitionWorkflowHistory 
 	where uidRequisitionId = RWH.uidRequisitionId 
 	and dteLandingDate > RWH.dteLandingDate 
-	order by dteLandingDate
+	order by dteLandingDate),getdate())
 ) as dteEndDate
 from relRequisitionWorkflowHistory RWH
 join refRequisitionWorkflowStep RWS on RWH.uidRequisitionWorkflowStepId = RWS.uidId
-WHERE RWH.uidRequisitionId IN 
+WHERE RWH.uidRequisitionId IN
 (
 	SELECT uidRequisitionId FROM #tmpReport_HiredCandidate
-) 
+)
 AND RWS.nvcName IN 
 (
 	'Review',
@@ -383,7 +367,7 @@ UPDATE #tmpReport_HiredCandidate
 SET intTimeToHire = DATEDIFF(day, dteCreationDate, dteHiredDate)
 
 
-CREATE TABLE #tmpTemplateFields
+CREATE TABLE #tmpTemplateFields   
 (
 	ID INT Identity(1,1),
 	FName VARCHAR(MAX),
@@ -558,7 +542,7 @@ BEGIN
 		SELECT @intCount = @intCount + 1
 		
 	END
-	END
+END
 
 CREATE TABLE #tmpTFValues
 (
@@ -588,7 +572,6 @@ WHERE ID IN
 	HAVING COUNT(*) < 2
 )
 
-
 CREATE TABLE #tmpAR_Result (uidApplicationId uniqueidentifier)
 
 SELECT @nvcSql = 'ALTER TABLE #tmpAR_Result ADD '
@@ -600,7 +583,6 @@ SELECT @nvcSql = LEFT(@nvcSql, LEN(@nvcSql)-1)
 EXEC sp_executeSql @nvcSql
 
 SET @intCount = 1
-
 
 IF (SELECT COUNT(*) FROM #tmpTFValues) > 0
 BEGIN
@@ -639,8 +621,6 @@ BEGIN
 END
 
 TRUNCATE TABLE #tmpTemplateFields
-
-
 
 INSERT INTO #tmpTemplateFields
 (
@@ -906,10 +886,7 @@ SELECT @nvcParameterDefinition = '
 
 TRUNCATE TABLE #tmpTFDupValues
 
---IF (EXISTS(SELECT * FROM INFORMATION_SCHEMA.TABLES 
---WHERE TABLE_SCHEMA = 'neptune_dynamic_objects' 
---AND  TABLE_NAME = 'relCandidateFieldValue_' + REPLACE(CAST(@SectionId As varchar(64)),'-','')))
-BEGIN
+BEGIN	
 	WHILE @intCount <= (SELECT COUNT(*) FROM #tmpTemplateFields)
 	BEGIN
 		SELECT @nvcFieldName = CTF.FName,
@@ -1021,8 +998,7 @@ BEGIN
 		SELECT @intCount = @intCount + 1
 		
 	END
-END 
-
+END
 TRUNCATE TABLE #tmpTFValues
 
 INSERT INTO #tmpTFValues (FN, RelId, Value)
@@ -1099,34 +1075,35 @@ RHC.nvcRequisitionJobStatus AS 'Job Status',
 RHC.nvcJobCreator AS 'Job Creator',
 RHC.nvcJobOwner AS 'Job Owner',
 CONVERT(varchar, RHC.dteCreationDate, 106) AS 'Date Job Created',
-CONVERT(varchar, RHC.dteJobFirstAdvertised, 106) AS 'Date Job First Advertised',
+CONVERT(varchar,RHC.dteJobFirstAdvertised, 106) AS 'Date Job First Advertised',
 RHC.intDaysAdvertised AS 'Days Job Advertised',
+--RHC.intDaysReview AS 'Days Job In Review',
 RHC.intDaysActive AS 'Days Job Active',
 CONVERT(varchar, RHC.dteJobDateArchived, 106) AS 'Date Job Archived',
 RHC.intTotalJobTat AS 'Total Job TAT in Days',
 RHC.nvcRegistrationWebsite AS 'Registration Website',
 CONVERT(varchar, RHC.dteCandidateRegistrationDate, 106) AS 'Registration Date',
 CONVERT(varchar, RHC.dteCandidateLastAccessedDate, 106) AS 'Last Accessed Date',
-RHC.dteApplicationDate AS 'Application Date',
-CONVERT(varchar, RHC.nvcApplicationStatus, 106) AS 'Application Status',
-CONVERT(varchar, RHC.dteHiredDate, 106) AS 'Hired Date',
+CONVERT(varchar, RHC.dteApplicationDate, 106) AS 'Application Date',
+RHC.nvcApplicationStatus AS 'Application Status',
+RHC.dteHiredDate AS 'Hired Date',
 RHC.nvcHiredBy AS 'Hired By',
 RHC.intApplicantTat AS 'Applicant TAT',
 RHC.intTimeToHire AS 'Time To Hire',
 RHC.nvcOrigin AS 'Application Origin',
 RHC.nvcAgencyName AS 'Agency Name',
-RFR.ReasonForRegret AS 'Reason For Regret',
-RFR.PreviousStep AS 'Reason For Regret Previous Step',
 ARR.*,
 RRR.*, 
 RHC.nvcCandidateEmail AS 'Email',
 RHC.nvcCandidateMobileNumber AS 'Cell/Mobile Number',
 CRR.*
 FROM #tmpReport_HiredCandidate RHC
-LEFT JOIN @tmpReasonForRegret RFR ON RHC.uidApplicationId = RFR.uidApplicationId
-LEFT JOIN #tmpAR_Result ARR ON RHC.uidApplicationId = ARR.uidApplicationId
-LEFT JOIN #tmpRR_Result RRR ON RHC.uidRequisitionId = RRR.uidRequisitionId
-LEFT JOIN #tmpCR_Result CRR ON RHC.uidCandidateId = CRR.uidCandidateId
+LEFT JOIN #tmpAR_Result ARR
+on RHC.uidApplicationId = ARR.uidApplicationId
+LEFT JOIN #tmpRR_Result RRR
+ON RHC.uidRequisitionId = RRR.uidRequisitionId
+LEFT JOIN #tmpCR_Result CRR
+ON RHC.uidCandidateId = CRR.uidCandidateId
 ORDER BY RHC.nvcJobReferenceCode
 
 DROP TABLE #tmpReport_HiredCandidate

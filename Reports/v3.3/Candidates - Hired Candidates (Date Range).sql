@@ -1,5 +1,5 @@
 -- Hired Candidates (Date Range)
--- 20150601
+-- 20150708
 SET NOCOUNT ON;
 SET DATEFORMAT DMY
 
@@ -222,12 +222,12 @@ WHERE APP.uidId IN
 )
 
 -- START REQUISITION PUBLISHING DAYS CALCULATIONS
-DECLARE @uidRequisitionId uniqueidentifier
-
-DECLARE @dteFirstPublishDate datetime
-DECLARE @dteLastPublishDate datetime
-DECLARE @dteDatePosition datetime
-DECLARE @intIsPublished int
+DECLARE @tmpRequisitionPublishedDaysCount TABLE
+(
+intRowCount int,
+uidRequisitionId uniqueidentifier,
+intDaysPublished int
+)
 
 DECLARE @tmpRequisisitionPublishedDates TABLE
 (
@@ -235,33 +235,42 @@ DECLARE @tmpRequisisitionPublishedDates TABLE
 	intPublished int
 )
 
-DECLARE @tmpRequisisitionPublishedCount TABLE
+DECLARE @tmpPublishedDatesBeginEnd TABLE
 (
-	uidRequisitionId uniqueidentifier,
-	intDaysPublished int
+dteStartDate datetime,
+dteEndDate datetime
 )
 
-SET ROWCOUNT 0
+INSERT INTO @tmpRequisitionPublishedDaysCount(intRowCount, uidRequisitionId)
+SELECT ROW_NUMBER() OVER(ORDER BY dteCreationDate DESC) AS Row, uidId FROM dtlRequisition WHERE uidId IN (SELECT uidRequisitionId FROM #tmpReport_HiredCandidate)
+ 
+DECLARE @uidRequisitionId uniqueidentifier
+DECLARE @dteLastPublishDate datetime
+DECLARE @dteDatePosition datetime
+DECLARE @intIsPublished int
+DECLARE @DaysPublished int
+DECLARE @RowCount int
+DECLARE @i int
 
-SELECT DISTINCT uidRequisitionId 
-INTO #tmpRequisitions
-FROM #tmpReport_HiredCandidate 
-WHERE uidRequisitionId IN 
-(SELECT DISTINCT uidRequisitionId FROM relRequisitionWebsite)
+SET @RowCount = (SELECT COUNT(uidRequisitionId) FROM @tmpRequisitionPublishedDaysCount) 
 
-SET ROWCOUNT 1
+SET @i = 1
 
-SELECT @uidRequisitionId = uidRequisitionId FROM #tmpRequisitions
-
-WHILE @@ROWCOUNT <> 0
+WHILE (@i <= @RowCount)
 BEGIN
-	SET ROWCOUNT 0
+	SELECT @uidRequisitionId = uidRequisitionId FROM @tmpRequisitionPublishedDaysCount WHERE intRowCount = @i
+	INSERT INTO @tmpPublishedDatesBeginEnd (dteStartDate, dteEndDate)
+	SELECT dteStartDate, ISNULL(dteEndDate,GETDATE()) FROM relRequisitionWebsite where uidRequisitionId = @uidRequisitionId
 	
-	SELECT @dteFirstPublishDate = MIN(dteStartDate) FROM relRequisitionWebsite WHERE uidRequisitionId = @uidRequisitionId
-	SELECT @dteLastPublishDate = ISNULL(MAX(dteEndDate), GETDATE()) FROM relRequisitionWebsite WHERE uidRequisitionId = @uidRequisitionId
+	SELECT @dteLastPublishDate = MAX(dteEndDate) FROM @tmpPublishedDatesBeginEnd
 	
-	SELECT @dteDatePosition = @dteFirstPublishDate
-
+	IF @dteLastPublishDate > GETDATE()
+	BEGIN
+		SET @dteLastPublishDate = GETDATE()
+	END
+	
+	SELECT @dteDatePosition = MIN(dteStartDate) FROM relRequisitionWebsite WHERE uidRequisitionId = @uidRequisitionId
+	
 	WHILE @dteDatePosition <= @dteLastPublishDate
 	BEGIN	
 		SELECT @intIsPublished = 0
@@ -277,16 +286,17 @@ BEGIN
 		SELECT @dteDatePosition = DATEADD(dd, 1, @dteDatePosition)
 	END
 	
-	INSERT INTO @tmpRequisisitionPublishedCount
-	SELECT @uidRequisitionId, (SELECT SUM(intPublished) FROM @tmpRequisisitionPublishedDates) 
-		
-	DELETE #tmpRequisitions WHERE uidRequisitionId = @uidRequisitionId
-	DELETE @tmpRequisisitionPublishedDates
+	SELECT @DaysPublished = SUM(intPublished) FROM @tmpRequisisitionPublishedDates
 	
-	SET ROWCOUNT 1
-	SELECT @uidRequisitionId = uidRequisitionId FROM #tmpRequisitions
+	UPDATE @tmpRequisitionPublishedDaysCount
+	SET intDaysPublished = @DaysPublished
+	WHERE intRowCount = @i
+	
+	DELETE FROM @tmpRequisisitionPublishedDates
+	DELETE FROM @tmpPublishedDatesBeginEnd
+	
+SET @i = @i + 1
 END
-SET ROWCOUNT 0
 -- END REQUISITION PUBLISHING DAYS CALCULATIONS
 
 DECLARE @tmpRequisitionWorkflowstepDays TABLE
@@ -311,44 +321,41 @@ RWH.uidRequisitionId,
 RWS.nvcName,
 RWH.dteLandingDate as dteStartDate,
 (
-	select top 1 dteLandingDate 
+	isnull((select top 1 dteLandingDate 
 	from relRequisitionWorkflowHistory 
 	where uidRequisitionId = RWH.uidRequisitionId 
 	and dteLandingDate > RWH.dteLandingDate 
-	order by dteLandingDate
+	order by dteLandingDate),getdate())
 ) as dteEndDate
 from relRequisitionWorkflowHistory RWH
 join refRequisitionWorkflowStep RWS on RWH.uidRequisitionWorkflowStepId = RWS.uidId
-WHERE RWH.uidRequisitionId IN 
+WHERE RWH.uidRequisitionId IN
 (
 	SELECT uidRequisitionId FROM #tmpReport_HiredCandidate
 )
-AND 
-RWH.uidRequisitionId IN
+AND RWS.nvcName IN 
 (
-	SELECT uidRequisitionId 
-	FROM #tmpReport_HiredCandidate
+	'Review',
+	'Sourcing',
+	'Active'
 )
---AND RWS.nvcName = 'Active'
 order by uidRequisitionId, dteLandingDate
 
-UPDATE @tmpRequisitionWorkflowstepDays
-SET intStepDays = DATEDIFF(dd, dteStartDate, dteEndDate)
+DECLARE @tmpRequisitionWorkflowstepDaysTotals TABLE
+(	
+	uidRequisitionId uniqueidentifier,
+	intStepDays int
+)
 
-
-UPDATE #tmpReport_HiredCandidate
-SET intDaysActive = B.intStepDays
-FROM #tmpReport_HiredCandidate A
-LEFT JOIN
-(
-	SELECT uidRequisitionId, intStepDays 
-	FROM @tmpRequisitionWorkflowstepDays
-	WHERE nvcStepStatus = 'Active'
-) B
-ON A.uidRequisitionId = B.uidRequisitionId
+INSERT INTO @tmpRequisitionWorkflowstepDaysTotals (uidRequisitionId, intStepDays)
+SELECT uidRequisitionId, DATEDIFF(dd, MIN(dteStartDate), MAX(dteEndDate)) + 1
+FROM @tmpRequisitionWorkflowstepDays GROUP BY uidRequisitionId 
 
 UPDATE #tmpReport_HiredCandidate
-SET intDaysAdvertised = (SELECT intDaysPublished FROM @tmpRequisisitionPublishedCount WHERE uidRequisitionId = #tmpReport_HiredCandidate.uidRequisitionId)
+SET intDaysActive = (SELECT intStepDays FROM @tmpRequisitionWorkflowstepDaysTotals WHERE uidRequisitionId = #tmpReport_HiredCandidate.uidRequisitionId)
+
+UPDATE #tmpReport_HiredCandidate
+SET intDaysAdvertised = (SELECT intDaysPublished FROM @tmpRequisitionPublishedDaysCount WHERE uidRequisitionId = #tmpReport_HiredCandidate.uidRequisitionId)
 
 UPDATE #tmpReport_HiredCandidate
 SET intTotalJobTat = DATEDIFF(day, dteJobFirstAdvertised, dteJobDateArchived)
@@ -1079,7 +1086,7 @@ CONVERT(varchar, RHC.dteCandidateRegistrationDate, 106) AS 'Registration Date',
 CONVERT(varchar, RHC.dteCandidateLastAccessedDate, 106) AS 'Last Accessed Date',
 CONVERT(varchar, RHC.dteApplicationDate, 106) AS 'Application Date',
 RHC.nvcApplicationStatus AS 'Application Status',
-RHC.dteHiredDate AS 'Hired Date',
+CONVERT(varchar, RHC.dteHiredDate, 106) AS 'Hired Date',
 RHC.nvcHiredBy AS 'Hired By',
 RHC.intApplicantTat AS 'Applicant TAT',
 RHC.intTimeToHire AS 'Time To Hire',
@@ -1106,4 +1113,3 @@ DROP TABLE #tmpTFValues
 DROP TABLE #tmpAR_Result
 DROP TABLE #tmpRR_Result
 DROP TABLE #tmpCR_Result
-DROP TABLE #tmpRequisitions

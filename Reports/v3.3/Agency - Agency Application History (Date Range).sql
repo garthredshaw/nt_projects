@@ -1,5 +1,5 @@
 -- Agency Application History (Date Range)
--- 20150528
+-- 20150707
 SET NOCOUNT ON
 SET DATEFORMAT DMY
 
@@ -13,8 +13,7 @@ SELECT DISTINCT RW.uidRequisitionId
 FROM relRequisitionWebsite RW
 JOIN relRequisitionAgency RA ON RW.uidRequisitionId = RA.uidRequisitionId
 WHERE (CAST(FLOOR(CAST(RW.dteStartDate AS FLOAT))AS DATETIME) >= '@FromDate'
-AND CAST(FLOOR(CAST(RW.dteEndDate AS FLOAT))AS DATETIME) <= '@ToDate')
-AND RW.uidWebsiteId IN (SELECT uidId FROM refWebsite WHERE nvcName = 'Agency')
+AND CAST(FLOOR(CAST(RW.dteStartDate AS FLOAT))AS DATETIME) <= '@ToDate')
 
 DECLARE @tmpAgencyApplications TABLE
 (
@@ -58,18 +57,19 @@ GROUP BY AC1.uidAgencyId, A2.uidRequisitionId, RDT1.nvcTranslation
 
 DECLARE @tmpAWSHistory TABLE
 (
+	uidApplicationWorkflowStepId uniqueidentifier,
 	uidRequisitionId uniqueidentifier,
 	uidApplicationId uniqueidentifier,
-	uidApplicationWorkflowStepId uniqueidentifier,
 	uidAgencyId uniqueidentifier
 )
 
 INSERT INTO @tmpAWSHistory
-SELECT APP.uidRequisitionId, 
+SELECT DISTINCT AWH.uidApplicationWorkflowStepId,
+APP.uidRequisitionId, 
 APP.uidId,
-APP.uidApplicationWorkflowStepId,
 AC.uidAgencyId
 FROM relApplication APP
+JOIN relApplicationWorkflowHistory AWH ON APP.uidId = AWH.uidApplicationId 
 JOIN dtlCandidate CAN ON APP.uidCandidateId = CAN.uidId 
 JOIN relAgencyCandidate AC ON CAN.uidId = AC.uidCandidateId 
 WHERE APP.uidId IN 

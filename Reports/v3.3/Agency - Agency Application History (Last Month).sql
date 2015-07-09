@@ -1,5 +1,5 @@
 -- Agency Application History (Last Month)
--- 20150528
+-- 20150707
 SET NOCOUNT ON
 SET DATEFORMAT DMY
 
@@ -14,7 +14,6 @@ FROM relRequisitionWebsite RW
 JOIN relRequisitionAgency RA ON RW.uidRequisitionId = RA.uidRequisitionId
 WHERE (DATEPART(mm, RW.dteStartDate) = DATEPART(mm, DATEADD(mm, -1, GETDATE()))
 AND DATEPART(yyyy, RW.dteStartDate) = DATEPART(yyyy, DATEADD(mm, -1, GETDATE())))
-AND RW.uidWebsiteId IN (SELECT uidId FROM refWebsite WHERE nvcName = 'Agency')
 
 DECLARE @tmpAgencyApplications TABLE
 (
@@ -49,8 +48,8 @@ FROM relApplication A2
 JOIN dtlCandidate C1 ON A2.uidCandidateId = C1.uidId 
 JOIN relCandidateSectionValue CSV1 ON C1.uidId = CSV1.uidCandidateId
 JOIN neptune_dynamic_objects.relCandidateFieldValue_CBAE5C2B870E48D0A8C280B713CEB2B4 CFV1 ON CSV1.uidId = CFV1.uidCandidateSectionValueId 
-JOIN refReferenceDataItem RDI1 ON CFV1.uidIdValue = RDI1.uidId AND CFV1.uidCandidateFieldId = '37EA1626-39FC-4B1E-83C1-4EDFE03D66E8' 
-JOIN relReferenceDataTranslation RDT1 ON RDI1.uidId = RDT1.uidReferenceDataItemId AND RDT1.uidLanguageId = '4850874D-715B-4950-B188-738E2FFC1520' 
+JOIN refReferenceDataItem RDI1 ON CFV1.uidIdValue = RDI1.uidId AND CFV1.uidCandidateFieldId = '37EA1626-39FC-4B1E-83C1-4EDFE03D66E8' -- Race
+JOIN relReferenceDataTranslation RDT1 ON RDI1.uidId = RDT1.uidReferenceDataItemId AND RDT1.uidLanguageId = '4850874D-715B-4950-B188-738E2FFC1520' -- English
 JOIN relAgencyCandidate AC1 ON C1.uidId = AC1.uidCandidateId 
 WHERE A2.uidId IN (SELECT uidApplicationId FROM @tmpAgencyApplications)
 GROUP BY AC1.uidAgencyId, A2.uidRequisitionId, RDT1.nvcTranslation 
@@ -58,18 +57,19 @@ GROUP BY AC1.uidAgencyId, A2.uidRequisitionId, RDT1.nvcTranslation
 
 DECLARE @tmpAWSHistory TABLE
 (
+	uidApplicationWorkflowStepId uniqueidentifier,
 	uidRequisitionId uniqueidentifier,
 	uidApplicationId uniqueidentifier,
-	uidApplicationWorkflowStepId uniqueidentifier,
 	uidAgencyId uniqueidentifier
 )
 
 INSERT INTO @tmpAWSHistory
-SELECT APP.uidRequisitionId, 
+SELECT DISTINCT AWH.uidApplicationWorkflowStepId,
+APP.uidRequisitionId, 
 APP.uidId,
-APP.uidApplicationWorkflowStepId,
 AC.uidAgencyId
 FROM relApplication APP
+JOIN relApplicationWorkflowHistory AWH ON APP.uidId = AWH.uidApplicationId 
 JOIN dtlCandidate CAN ON APP.uidCandidateId = CAN.uidId 
 JOIN relAgencyCandidate AC ON CAN.uidId = AC.uidCandidateId 
 WHERE APP.uidId IN 
